@@ -1,0 +1,15 @@
+# TODO LIST
+- [x] 跑通模型
+- [x] bert 多卡
+- [ ] 保存、加载
+- [x] 跳过超过最大句长的句子
+- [ ] 保存加载预处理的dataset
+- [ ] 支持xlnet和roberta
+- [ ] 重构Transformer的输入
+- [ ] 重构Transformer的encoder
+- [ ] 重构CharRNN的输入
+- [ ] 重构HLSTM的encoder
+- [ ] 重构预测得到probs的后处理部分
+- [ ] 删除无用、过时代码
+- [ ] 支持tensorboardX
+- [ ] 支持句法依存分析
