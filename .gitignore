@@ -9,7 +9,7 @@ __pycache__/
 *.so
 
 deprecated_*.py
-/deprecated_*
+**/deprecated_*
 
 /checkpoints
 /embeddings
