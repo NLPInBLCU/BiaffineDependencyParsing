@@ -8,6 +8,12 @@ __pycache__/
 # C extensions
 *.so
 
+deprecated_*.py
+/deprecated_*
+
+/checkpoints
+/embeddings
+
 # Distribution / packaging
 .Python
 build/
