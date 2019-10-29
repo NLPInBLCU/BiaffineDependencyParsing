@@ -3,8 +3,8 @@
 import os
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
-from utils.input_utils.conll_file import load_conllu_file
-from utils.input_utils.graph_vocab import GraphVocab
+from common.input_utils.conll_file import load_conllu_file
+from common.input_utils.graph_vocab import GraphVocab
 from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
 
 BERT_TOKENIZER = {

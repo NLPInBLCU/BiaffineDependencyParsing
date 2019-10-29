@@ -16,6 +16,14 @@
 - [ ] 重构CharRNN的输入
 - [ ] 重构HLSTM的encoder
 - [ ] 重构预测得到probs的后处理部分
-- [ ] 删除无用、过时代码
+- [x] 删除无用、过时代码
 - [ ] 支持tensorboardX
 - [ ] 支持句法依存分析
+- [ ] BERT后添加一个self-attention层
+- [ ] 加入Layer Attention、Layer Dropout
+- [ ] Input Masking
+- [ ] inverse square root learning rate decay (Vaswani et al., 2017). 
+- [ ] 多任务训练 text/news分成两个decoder一起训练（此时训练集也得分开）
+- [ ] 多任务训练 + POS 标注
+- [ ] 多任务训练 + NER
+

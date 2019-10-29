@@ -14,13 +14,16 @@ import os
 import random
 import torch
 import numpy as np
-from utils.arguments import parse_args
+import pathlib
+import shutil
+from datetime import datetime
+from common.arguments import parse_args
 from models.biaffine_trainer import BERTBiaffineTrainer
 from models.biaffine_model import BiaffineDependencyModel
-from utils.input_utils.bert.bert_input_utils import load_input
-from utils.input_utils.graph_vocab import GraphVocab
-from utils.seed import set_seed
-from utils.timer import Timer
+from common.input_utils.bert.bert_input_utils import load_input
+from common.input_utils.graph_vocab import GraphVocab
+from common.seed import set_seed
+from common.timer import Timer
 
 
 # def set_seed(args):
@@ -48,6 +51,16 @@ def load_trainer(args):
 def main():
     with Timer('parse args'):
         args = parse_args()
+    output_dir = pathlib.Path(args.output_dir)
+    assert output_dir.is_dir()
+    time_str = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
+    output_dir = output_dir / (pathlib.Path(args.config_file).stem + time_str)
+    if output_dir.exists():
+        raise RuntimeError(f'{output_dir} exists! (maybe file or dir)')
+    else:
+        output_dir.mkdir()
+        shutil.copyfile(args.config_file, str(output_dir / pathlib.Path(args.config_file).name))
+        (output_dir / 'saved_models').mkdir()
 
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
     args.n_gpu = torch.cuda.device_count()

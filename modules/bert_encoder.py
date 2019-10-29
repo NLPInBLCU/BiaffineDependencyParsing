@@ -13,11 +13,12 @@ from pytorch_transformers import (BertConfig,
                                   XLNetForSequenceClassification,
                                   XLNetTokenizer, BertModel)
 
-from utils.information import debug_print
-from utils.input_utils.bert.bert_input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
-from utils.input_utils.graph_vocab import GraphVocab
+from common.information import debug_print
+from common.input_utils.bert.bert_input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
+from common.input_utils.graph_vocab import GraphVocab
+from modules.layer_attention import LayerAttention
 
-MODEL_CLASSES = {
+BERT_MODEL_CLASSES = {
     'bert': (BertConfig, BertModel, BertTokenizer),
     'xlnet': (XLNetConfig, XLNetForSequenceClassification, XLNetTokenizer),
     'xlm': (XLMConfig, XLMForSequenceClassification, XLMTokenizer),
@@ -39,7 +40,8 @@ class BERTTypeEncoder(nn.Module):
             encoder_type='bert',
             bert_path='.',
             bert_output_mode='last',
-            bert_chinese_word_embedding_select_mode='s'
+            bert_chinese_word_embedding_select_mode='s',
+            layer_dropout=0.1,
     ):
         super().__init__()
         if local_rank == -1 or no_cuda:  # 单机(多卡)训练
@@ -51,18 +53,23 @@ class BERTTypeEncoder(nn.Module):
             # torch.distributed.init_process_group(backend='nccl')
             # self.n_gpu = 1
             raise RuntimeError('暂时不支持分布式训练')
-        self.model_type = encoder_type.lower()
-        self.model_path = bert_path
-        self.config_class, self.model_class, _ = MODEL_CLASSES[self.model_type]
-        self.config = self.config_class.from_pretrained(self.model_path)
-        self.config.output_hidden_states = True
+        self.bert_model_type = encoder_type.lower()
+        self.bert_model_path = bert_path
+        self.bert_config_class, self.bert_model_class, _ = BERT_MODEL_CLASSES[self.bert_model_type]
+        self.bert_config = self.bert_config_class.from_pretrained(self.bert_model_path)
+        self.bert_config.output_hidden_states = True
         # self.tokenizer = self.tokenizer_class.from_pretrained(self.model_path, do_lower_case=True)
-        self.bert = self.model_class.from_pretrained(self.model_path,
-                                                     from_tf=bool('.ckpt' in self.model_path),
-                                                     config=self.config)
-        self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
+        self.bert = self.bert_model_class.from_pretrained(self.bert_model_path,
+                                                          from_tf=bool('.ckpt' in self.bert_model_path),
+                                                          config=self.bert_config)
+        self.dropout = nn.Dropout(self.bert_config.hidden_dropout_prob)
         self.bert_output_mode = bert_output_mode
         self.bert_chinese_word_embedding_select_mode = bert_chinese_word_embedding_select_mode
+        if self.bert_output_mode == 'attention':
+            self.layer_attention = LayerAttention(self.bert_config.num_hidden_layers, do_layer_norm=False,
+                                                  dropout=layer_dropout)
+        else:
+            self.layer_attention = None
         # debug_print('BERT config:')
         # debug_print(self.config)
         # self.model.to(self.device)
@@ -91,17 +98,20 @@ class BERTTypeEncoder(nn.Module):
             last_four_hidden_states = torch.stack(all_layers_hidden_states[-4:])
             encoder_output = torch.sum(last_four_hidden_states, 0)
         elif self.bert_output_mode == 'last_four_cat':
-            pass
+            raise NotImplementedError(f'do not support this bert_output_mode:{self.bert_output_mode}')
             # torch.cat
         elif self.bert_output_mode == 'all_sum':
             all_hidden_states = torch.stack(all_layers_hidden_states)
             encoder_output = torch.sum(all_hidden_states, 0)
+        elif self.bert_output_mode == 'attention':
+            all_hidden_states = torch.stack(all_layers_hidden_states)
+            encoder_output = self.layer_attention(all_hidden_states, attention_mask)
         else:
             raise Exception('bad bert output mode')
         # mask:
         # encoder_output = attention_mask.unsqueeze(-1).to(encoder_output.dtype) * encoder_output
-        attention_mask = torch.eq(attention_mask, 0)
-        encoder_output = encoder_output.masked_fill(attention_mask.unsqueeze(2), 0)
+        output_pad_mask = torch.eq(attention_mask, 0)
+        encoder_output = encoder_output.masked_fill(output_pad_mask.unsqueeze(2), 0)
         # 必须先mask然后再index select
         if self.bert_chinese_word_embedding_select_mode == 's':
             encoder_output = batched_index_select(encoder_output, 1, start_pos)
@@ -110,8 +120,9 @@ class BERTTypeEncoder(nn.Module):
         elif self.bert_chinese_word_embedding_select_mode == 's+e':
             encoder_output = batched_index_select(encoder_output, 1, start_pos) \
                              + batched_index_select(encoder_output, 1, end_pos)
+            encoder_output /= 2
         elif self.bert_chinese_word_embedding_select_mode == 's-e':
-            pass
+            raise NotImplementedError('not support this select mode')
         return self.dropout(encoder_output)
 
 

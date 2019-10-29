@@ -6,14 +6,14 @@ import torch.nn as nn
 from tqdm import tqdm
 from abc import ABCMeta, abstractmethod
 
-from utils.information import debug_print
-from utils.input_utils.conll_file import CoNLLFile
-from utils.input_utils.graph_vocab import GraphVocab
-from utils.model_utils.get_optimizer import get_optimizer
-from utils.model_utils.parser_funs import sdp_decoder, parse_semgraph
-import utils.model_utils.sdp_simple_scorer as sdp_scorer
-from utils.best_result import BestResult
-from utils.seed import set_seed
+from common.information import debug_print
+from common.input_utils.conll_file import CoNLLFile
+from common.input_utils.graph_vocab import GraphVocab
+from common.model_utils.get_optimizer import get_optimizer
+from common.model_utils.parser_funs import sdp_decoder, parse_semgraph
+import common.model_utils.sdp_simple_scorer as sdp_scorer
+from common.best_result import BestResult
+from common.seed import set_seed
 
 
 class BiaffineDependencyTrainer(metaclass=ABCMeta):

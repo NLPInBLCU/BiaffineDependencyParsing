@@ -13,8 +13,8 @@
 import os
 
 
-def ensure_dir(d, verbose=True):
-    if not os.path.exists(d):
+def ensure_dir(dir, verbose=True):
+    if not os.path.exists(dir):
         if verbose:
             print("Directory {} do not exist; creating...".format(d))
-        os.makedirs(d)
+        os.makedirs(dir)

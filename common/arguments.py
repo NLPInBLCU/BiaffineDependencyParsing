@@ -23,6 +23,7 @@ def parse_args():
         if sub_dict:
             for k, v in sub_dict.items():
                 args_dict[k] = v
+    args_dict['config_file'] = args.config_file
     # device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
     # args_dict['device'] = device
     args = ArgsClass(args_dict)

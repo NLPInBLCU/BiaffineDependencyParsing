@@ -3,8 +3,8 @@
 import torch
 import torch.nn as nn
 
-from utils.input_utils.bert.bert_input_utils import load_bert_tokenizer, load_and_cache_examples, get_data_loader
-from utils.input_utils.graph_vocab import GraphVocab
+from common.input_utils.bert.bert_input_utils import load_bert_tokenizer, load_and_cache_examples, get_data_loader
+from common.input_utils.graph_vocab import GraphVocab
 from modules.bert_encoder import BERTTypeEncoder
 from modules.biaffine import DeepBiaffineScorer, DirectBiaffineScorer
 

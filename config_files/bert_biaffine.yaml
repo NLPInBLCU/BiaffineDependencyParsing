@@ -20,10 +20,10 @@ data_set:
   per_gpu_eval_batch_size: 10
   skip_too_long_input: true
 output:
-  saved_model_dir: 'checkpoints'
-  save_name: 'bert'
-  dev_output_file: 'output/exam1.conllu'
-  best_result_file: 'output/exam1.best.text'
+  output_dir: 'output'
+#  save_name: 'bert'
+#  dev_output_file: 'output/exam1.conllu'
+#  best_result_file: 'output/exam1.best.text'
 graph_vocab: 
   #依存弧的vocab，必须提前生成
   graph_vocab_file: 'dataset/graph_vocab.txt'

@@ -11,10 +11,10 @@
 -------------------------------------------------
 """
 from abc import ABCMeta, abstractmethod
-from utils.logger import *
-from utils import model_utils, model_utils as sdp_scorer
-from utils.model_utils.optimization import *
-from utils.best_result import BestResult
+from common.logger import *
+from common import model_utils, model_utils as sdp_scorer
+from common.model_utils.optimization import *
+from common.best_result import BestResult
 
 
 class Wrapper(metaclass=ABCMeta):
