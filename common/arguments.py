@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Created by li huayong on 2019/10/8
 # import configargparse as argparse
+import os
+
 import torch
 import argparse
 import yaml
@@ -27,6 +29,14 @@ def parse_args():
     # device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
     # args_dict['device'] = device
     args = ArgsClass(args_dict)
+
+    if args.skip_too_long_input:
+        print(f'skip_too_long_input is True, max_seq_len is {args.max_seq_len}')
+
+    if args.encoder_type == 'bert':
+        if not os.path.isdir(args.bert_path):
+            raise ValueError(f'{args.bert_path} is not a dir or not exist !')
+
     return args
 
 
