@@ -32,6 +32,7 @@ from pytorch_transformers.optimization import *
 #     else:
 #         raise ValueError('illegal optim setting')
 #     return optimizer
+from utils.information import debug_print
 
 
 def get_optimizer_old(name, parameters, lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):
@@ -57,6 +58,7 @@ def get_optimizer(args, model):
         ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
         scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=args.max_steps)
+        debug_print('\n - Use AdamW Optimizer')
     elif args.encoder_type in ['lstm', 'gru']:
         if args.optimizer == 'sgd':
             optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate)

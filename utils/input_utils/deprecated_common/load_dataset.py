@@ -10,8 +10,8 @@
                    2019/8/5:
 -------------------------------------------------
 """
-from utils.input_utils.common import DataLoader
-from utils.input_utils.common import Pretrain
+from utils.input_utils.deprecated_common import DataLoader
+from utils.input_utils.deprecated_common import Pretrain
 from pathlib import Path
 
 

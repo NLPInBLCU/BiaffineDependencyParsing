@@ -13,6 +13,7 @@ from pytorch_transformers import (BertConfig,
                                   XLNetForSequenceClassification,
                                   XLNetTokenizer, BertModel)
 
+from utils.information import debug_print
 from utils.input_utils.bert.bert_input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
 from utils.input_utils.graph_vocab import GraphVocab
 
@@ -62,7 +63,8 @@ class BERTTypeEncoder(nn.Module):
         self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
         self.bert_output_mode = bert_output_mode
         self.bert_chinese_word_embedding_select_mode = bert_chinese_word_embedding_select_mode
-        print(self.config)
+        # debug_print('BERT config:')
+        # debug_print(self.config)
         # self.model.to(self.device)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None,

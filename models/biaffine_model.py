@@ -6,7 +6,7 @@ import torch.nn as nn
 from utils.input_utils.bert.bert_input_utils import load_bert_tokenizer, load_and_cache_examples, get_data_loader
 from utils.input_utils.graph_vocab import GraphVocab
 from modules.bert_encoder import BERTTypeEncoder
-from modules.biaffine import DeepBiaffineScorer
+from modules.biaffine import DeepBiaffineScorer, DirectBiaffineScorer
 
 
 class BiaffineDependencyModel(nn.Module):
@@ -22,17 +22,26 @@ class BiaffineDependencyModel(nn.Module):
             self.encoder = None  # Do NOT support now #todo
         elif args.encoder_type == 'transformer':
             self.encoder = None  # Do NOT support now #todo
-        self.unlabeled_biaffine = DeepBiaffineScorer(args.encoder_output_dim,
-                                                     args.encoder_output_dim,
-                                                     args.biaffine_hidden_dim,
-                                                     1, pairwise=True,
-                                                     dropout=args.biaffine_dropout)
-        self.labeled_biaffine = DeepBiaffineScorer(args.encoder_output_dim,
-                                                   args.encoder_output_dim,
-                                                   args.biaffine_hidden_dim,
-                                                   len(self.graph_vocab.get_labels()),
-                                                   pairwise=True,
-                                                   dropout=args.biaffine_dropout)
+        if args.direct_biaffine:
+            self.unlabeled_biaffine = DirectBiaffineScorer(args.encoder_output_dim,
+                                                           args.encoder_output_dim,
+                                                           1, pairwise=True)
+            self.labeled_biaffine = DirectBiaffineScorer(args.encoder_output_dim,
+                                                         args.encoder_output_dim,
+                                                         len(self.graph_vocab.get_labels()),
+                                                         pairwise=True)
+        else:
+            self.unlabeled_biaffine = DeepBiaffineScorer(args.encoder_output_dim,
+                                                         args.encoder_output_dim,
+                                                         args.biaffine_hidden_dim,
+                                                         1, pairwise=True,
+                                                         dropout=args.biaffine_dropout)
+            self.labeled_biaffine = DeepBiaffineScorer(args.encoder_output_dim,
+                                                       args.encoder_output_dim,
+                                                       args.biaffine_hidden_dim,
+                                                       len(self.graph_vocab.get_labels()),
+                                                       pairwise=True,
+                                                       dropout=args.biaffine_dropout)
         # self.dropout = nn.Dropout(args.dropout)
         if args.learned_loss_ratio:
             self.label_loss_ratio = nn.Parameter(torch.Tensor([0.5]))

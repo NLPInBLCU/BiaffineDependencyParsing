@@ -104,6 +104,18 @@ class PairwiseBiaffineScorer(nn.Module):
         return self.W_bilin(input1, input2)
 
 
+class DirectBiaffineScorer(nn.Module):
+    def __init__(self, input1_size, input2_size, output_size, pairwise=True):
+        super().__init__()
+        if pairwise:
+            self.scorer = PairwiseBiaffineScorer(input1_size, input2_size, output_size)
+        else:
+            self.scorer = BiaffineScorer(input1_size, input2_size, output_size)
+
+    def forward(self, input1, input2):
+        return self.scorer(input1, input2)
+
+
 class DeepBiaffineScorer(nn.Module):
     def __init__(self, input1_size, input2_size, hidden_size, output_size, hidden_func=F.relu, dropout=0,
                  pairwise=True):

@@ -15,20 +15,21 @@ class ArgsClass(object):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config_file', default='config_files/bert_biaffine.yaml')
+    parser.add_argument('-c', '--config_file', required=True)
     args = parser.parse_args()
-    yaml_config = yaml.load(open(args.config_file))
+    yaml_config = yaml.load(open(args.config_file, encoding='utf-8'))
     args_dict = {}
     for sub_dict in yaml_config.values():
         if sub_dict:
             for k, v in sub_dict.items():
                 args_dict[k] = v
-    #device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-    #args_dict['device'] = device
+    # device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+    # args_dict['device'] = device
     args = ArgsClass(args_dict)
     return args
 
 
 if __name__ == '__main__':
     from pprint import pprint
+
     pprint(vars(parse_args()))

@@ -3,7 +3,7 @@ Utility functions for data transformations.
 """
 
 import torch
-import utils.input_utils.common.constant as constant
+import utils.input_utils.deprecated_common.constant as constant
 
 
 def map_to_ids(tokens, vocab):

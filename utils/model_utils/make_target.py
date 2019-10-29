@@ -11,7 +11,7 @@
 -------------------------------------------------
 """
 import torch
-from utils.input_utils.common import GraphVocab
+from utils.input_utils.deprecated_common import GraphVocab
 from utils.input_utils.conll_file import load_conllu_file
 
 

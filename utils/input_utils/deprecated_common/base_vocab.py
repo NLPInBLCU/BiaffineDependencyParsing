@@ -12,7 +12,7 @@ VOCAB_PREFIX = [PAD, UNK, EMPTY, ROOT]
 
 
 class BaseVocab:
-    """ A base class for common vocabulary operations. Each subclass should at least 
+    """ A base class for deprecated_common vocabulary operations. Each subclass should at least
     implement its own build_vocab() function."""
 
     def __init__(self, data=None, lang="", idx=0, cutoff=0, lower=False):

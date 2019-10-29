@@ -55,7 +55,7 @@ def main():
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
 
     if args.skip_too_long_input:
-        print(f'skip_too_long_input is True, max_seq_len if {args.max_seq_len}')
+        print(f'skip_too_long_input is True, max_seq_len is {args.max_seq_len}')
 
     if args.encoder_type == 'bert':
         if not os.path.isdir(args.bert_path):
@@ -65,6 +65,19 @@ def main():
         train_data_loader, train_conllu, dev_data_loader, dev_conllu, _, _ = load_input(args,
                                                                                         train=True, dev=True,
                                                                                         test=False)
+    print(f'train batch size: {args.train_batch_size}')
+    print(f'train data batch num: {len(train_data_loader)}')
+    # 每个epoch做两次dev：
+    args.eval_interval = len(train_data_loader) // 2
+    print(f'eval interval: {args.eval_interval}')
+    # 最多过100个epoch, 注意该参数影响学习率warm up
+    args.max_steps = len(train_data_loader) * 100
+    print(f'max steps: {args.max_steps}')
+    # 如果6个epoch之后仍然不能提升，就停止
+    args.early_stop_steps = len(train_data_loader) * 6
+    print(f'early stop steps: {args.early_stop_steps}')
+
+    print()
     set_seed(args)
     with Timer('load trainer'):
         trainer = load_trainer(args)

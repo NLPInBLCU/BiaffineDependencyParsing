@@ -7,13 +7,13 @@ Created on Tue Feb 12 15:58:12 2019
 
 import random
 import torch
-import utils.input_utils.common.conll as conll
+import utils.input_utils.deprecated_common.conll as conll
 from .doc import Document
 from .base_vocab import PAD_ID, ROOT_ID
 from .vocabs import CharVocab, WordVocab, GraphVocab, MultiVocab
 from .data_funs import get_long_tensor, sort_all
 from .pretrain import Pretrain
-from utils.arguments_old import parse_args
+from utils.deprecated_arguments import parse_args
 from utils.logger import get_logger
 
 

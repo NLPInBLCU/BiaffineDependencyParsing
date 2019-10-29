@@ -4,11 +4,11 @@ A trainer class to handle training and testing of models.
 """
 import torch
 
-# from common.trainer import Trainer as BaseTrainer
+# from deprecated_common.trainer import Trainer as BaseTrainer
 from utils.model_utils.optimization import get_optimizer_old
 from utils import model_utils
 from .hdlstm_biaffine import Parser
-from utils.input_utils.common import MultiVocab
+from utils.input_utils.deprecated_common import MultiVocab
 # from model_utils.parser_funs import sdp_decoder, parse_semgraph
 from utils.model_utils.optimization import BertAdam
 from utils.logger import get_logger

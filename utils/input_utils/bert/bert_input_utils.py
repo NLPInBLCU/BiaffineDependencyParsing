@@ -288,7 +288,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
     return features
 
 
-def load_and_cache_examples(args, graph_vocab, tokenizer, train=True, dev=True, test=True):
+def load_and_cache_examples(args, graph_vocab, tokenizer, train=True, dev=True, test=False):
     word_vocab = tokenizer.vocab if args.encoder_type == 'bert' else None
     processor = CoNLLUProcessor(args, graph_vocab, word_vocab)
     # Load data features from cache or dataset file
@@ -348,7 +348,7 @@ def load_and_cache_examples(args, graph_vocab, tokenizer, train=True, dev=True, 
         # print("Saving features into cached file %s", cached_features_file)
         # torch.save(features, cached_features_file)
 
-        # Convert to Tensors and build dataset
+        ## Convert to Tensors and build dataset
         dev_dataset = make_dataset(args, dev_features)
     else:
         dev_dataset = dev_CoNLLU_file = None
@@ -373,7 +373,7 @@ def load_and_cache_examples(args, graph_vocab, tokenizer, train=True, dev=True, 
         # print("Saving features into cached file %s", cached_features_file)
         # torch.save(features, cached_features_file)
 
-        # Convert to Tensors and build dataset
+        ## Convert to Tensors and build dataset
         train_dataset = make_dataset(args, train_features)
     else:
         train_dataset = train_CoNLLU_file = None
@@ -407,7 +407,7 @@ def load_bert_tokenizer(model_path, model_type, do_lower_case=True):
                                                       additional_special_tokens=['[unused1]', '[unused2]', '[unused3]'])
 
 
-def load_input(args, train=True, dev=True, test=True):
+def load_input(args, train=True, dev=True, test=False):
     tokenizer = load_bert_tokenizer(args.bert_path, args.encoder_type)
     vocab = GraphVocab(args.graph_vocab_file)
     train_dataset, train_conllu, dev_dataset, dev_conllu, test_dataset, test_conllu = \

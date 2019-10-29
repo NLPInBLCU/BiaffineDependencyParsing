@@ -3,12 +3,14 @@
 import sys
 import inspect
 
+
 def debug_print(message):
     callerframerecord = inspect.stack()[1]
     frame = callerframerecord[0]
     info = inspect.getframeinfo(frame)
-    print(f' >>> {info.filename}, func={info.function}, line={info.lineno} :')
+    print(f'\n >>> {info.filename}, func={info.function}, line={info.lineno} :')
     print(message)
+
 
 if __name__ == '__main__':
     debug_print('this')
