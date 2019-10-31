@@ -5,10 +5,7 @@ The dot-product "Layer Attention" that is applied to the layers of BERT, along w
 from typing import List
 
 import torch
-from torch.nn import ParameterList, Parameter
-
-
-# from allennlp.common.checks import ConfigurationError
+import torch.nn as nn
 
 
 class LayerAttention(torch.nn.Module):
@@ -31,6 +28,15 @@ class LayerAttention(torch.nn.Module):
                  trainable: bool = True,
                  dropout: float = None,
                  dropout_value: float = -1e20) -> None:
+        """
+
+        :param mixture_size: 混合的Layer层数
+        :param do_layer_norm:
+        :param initial_scalar_parameters: 初始的每一层的attention系数，list
+        :param trainable:
+        :param dropout:
+        :param dropout_value:
+        """
         super().__init__()
         self.mixture_size = mixture_size
         self.do_layer_norm = do_layer_norm
@@ -39,16 +45,18 @@ class LayerAttention(torch.nn.Module):
         if initial_scalar_parameters is None:
             initial_scalar_parameters = [0.0] * mixture_size
         elif len(initial_scalar_parameters) != mixture_size:
-            raise ValueError("Length of initial_scalar_parameters {} differs "
-                             "from mixture_size {}".format(
-                initial_scalar_parameters, mixture_size))
-
-        self.scalar_parameters = ParameterList(
+            raise ValueError(
+                "Length of initial_scalar_parameters {} differs from mixture_size {}".format(initial_scalar_parameters,
+                                                                                             mixture_size))
+        # 训练参数化
+        self.scalar_parameters = nn.ParameterList(
             [
-                Parameter(torch.FloatTensor([initial_scalar_parameters[i]]),
-                          requires_grad=trainable) for i in range(mixture_size)
-            ])
-        self.gamma = Parameter(torch.FloatTensor([1.0]), requires_grad=trainable)
+                nn.Parameter(torch.FloatTensor([initial_scalar_parameters[i]]), requires_grad=trainable)
+                for i in range(mixture_size)
+            ]
+        )
+        # 最后的缩放系数
+        self.gamma = nn.Parameter(torch.FloatTensor([1.0]), requires_grad=trainable)
 
         if self.dropout:
             dropout_mask = torch.zeros(len(self.scalar_parameters))
@@ -84,6 +92,7 @@ class LayerAttention(torch.nn.Module):
         if self.dropout:
             weights = torch.where(self.dropout_mask.uniform_() > self.dropout, weights, self.dropout_fill)
 
+        # attention权重归一化：
         normed_weights = torch.nn.functional.softmax(weights, dim=0)
         normed_weights = torch.split(normed_weights, split_size_or_sections=1)
 
