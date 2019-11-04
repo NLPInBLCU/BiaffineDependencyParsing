@@ -6,7 +6,7 @@
 """
 from pathlib import Path
 from collections import Counter
-from common.input_utils.conll_file import load_conllu_file
+from utils.input_utils.conll_file import load_conllu_file
 
 
 def build_vocab(data_dir, cutoff=1):

@@ -17,9 +17,9 @@
 - [ ] 重构HLSTM的encoder
 - [ ] 重构预测得到probs的后处理部分
 - [x] 删除无用、过时代码
-- [ ] 支持tensorboardX
+- [x] 支持tensorboardX
 - [ ] 支持句法依存分析
-- [ ] BERT后添加一个self-attention层
+- [x] BERT后添加一个self-attention层
 - [x] 加入Layer Attention、Layer Dropout
 - [ ] Input Masking
 - [ ] inverse square root learning rate decay (Vaswani et al., 2017). 

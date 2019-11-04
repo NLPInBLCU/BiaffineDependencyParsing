@@ -17,13 +17,14 @@ import numpy as np
 import pathlib
 import shutil
 from datetime import datetime
-from common.arguments import parse_args
+from utils.arguments import parse_args
 from models.biaffine_trainer import BERTBiaffineTrainer
 from models.biaffine_model import BiaffineDependencyModel
-from common.input_utils.bert.bert_input_utils import load_input
-from common.input_utils.graph_vocab import GraphVocab
-from common.seed import set_seed
-from common.timer import Timer
+from utils.input_utils.bert.bert_input_utils import load_input
+from utils.input_utils.graph_vocab import GraphVocab
+from utils.seed import set_seed
+from utils.timer import Timer
+from utils.logger import init_logger, get_logger
 
 
 def load_trainer(args):
@@ -99,6 +100,8 @@ def make_output_dir(args):
         args.test_output_path = str(output_dir / 'test_output_conllu.txt')
         args.test_result_path = str(output_dir / 'test_metrics.txt')
         args.save_model_dir = str(output_dir / 'saved_models')
+        args.summary_dir = str(output_dir / 'summary')
+        init_logger(args.log_name, str(output_dir / 'parser.log'))
 
 
 if __name__ == '__main__':

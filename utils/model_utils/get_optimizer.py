@@ -32,7 +32,7 @@ from pytorch_transformers.optimization import *
 #     else:
 #         raise ValueError('illegal optim setting')
 #     return optimizer
-from common.information import debug_print
+from utils.information import debug_print
 
 
 def get_optimizer_old(name, parameters, lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):

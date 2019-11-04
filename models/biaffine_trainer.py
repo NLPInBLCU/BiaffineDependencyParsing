@@ -6,14 +6,19 @@ import torch.nn as nn
 from tqdm import tqdm
 from abc import ABCMeta, abstractmethod
 
-from common.information import debug_print
-from common.input_utils.conll_file import CoNLLFile
-from common.input_utils.graph_vocab import GraphVocab
-from common.model_utils.get_optimizer import get_optimizer
-from common.model_utils.parser_funs import sdp_decoder, parse_semgraph
-import common.model_utils.sdp_simple_scorer as sdp_scorer
-from common.best_result import BestResult
-from common.seed import set_seed
+from utils.information import debug_print
+from utils.input_utils.conll_file import CoNLLFile
+from utils.input_utils.graph_vocab import GraphVocab
+from utils.model_utils.get_optimizer import get_optimizer
+from utils.model_utils.parser_funs import sdp_decoder, parse_semgraph
+import utils.model_utils.sdp_simple_scorer as sdp_scorer
+from utils.best_result import BestResult
+from utils.seed import set_seed
+
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ImportError:
+    from tensorboardX import SummaryWriter
 
 
 class BiaffineDependencyTrainer(metaclass=ABCMeta):
@@ -93,6 +98,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         self.model.zero_grad()
         set_seed(self.args)  # Added here for reproductibility (even between python 2 and 3)
         train_stop = False
+        summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
         for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
             train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}')
@@ -115,30 +121,33 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                     epoch_ave_loss += loss
 
                 if global_step % self.args.eval_interval == 0:
+                    summary_writer.add_scalar('loss/train', loss, global_step)
                     if dev_data_loader:
                         UAS, LAS = self.dev(dev_data_loader, dev_CoNLLU_file)
+                        summary_writer.add_scalar('metrics/uas', UAS, global_step)
+                        summary_writer.add_scalar('metrics/las', LAS, global_step)
                         if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
                             print(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             print(best_result)
 
                 if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
                     print(f'\n## Early stop in step:{global_step} ##')
-                    print("\n## BEST RESULT in Training ##")
-                    print(best_result)
                     train_stop = True
                     break
 
                 if global_step > self.args.max_steps:
                     print(f'\n## Train Stop in step:{global_step} ##')
-                    print("\n## BEST RESULT in Training ##")
-                    print(best_result)
                     train_stop = True
                     break
             if train_stop:
                 with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
                     f.write(str(best_result) + '\n')
+                print("\n## BEST RESULT in Training ##")
+                print(best_result)
+                summary_writer.close()
                 return
-            print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
+            # print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
+            summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
 
     def dev(self, dev_data_loader, dev_CoNLLU_file):
         assert isinstance(dev_CoNLLU_file, CoNLLFile)

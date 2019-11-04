@@ -3,8 +3,8 @@
 import torch
 import torch.nn as nn
 
-from common.input_utils.bert.bert_input_utils import load_bert_tokenizer, load_and_cache_examples, get_data_loader
-from common.input_utils.graph_vocab import GraphVocab
+from utils.input_utils.bert.bert_input_utils import load_bert_tokenizer, load_and_cache_examples, get_data_loader
+from utils.input_utils.graph_vocab import GraphVocab
 from modules.bert_encoder import BERTTypeEncoder
 from modules.biaffine import DeepBiaffineScorer, DirectBiaffineScorer
 
@@ -18,7 +18,9 @@ class BiaffineDependencyModel(nn.Module):
                                            bert_path=args.bert_path,
                                            bert_chinese_word_embedding_select_mode=args.bert_chinese_word_select,
                                            bert_output_mode=args.bert_output_mode,
-                                           max_seq_len=args.max_seq_len)
+                                           max_seq_len=args.max_seq_len,
+                                           bert_after=args.bert_after,
+                                           after_layers=args.after_layers)
         elif args.encoder_type in ['lstm', 'gru']:
             self.encoder = None  # Do NOT support now #todo
         elif args.encoder_type == 'transformer':

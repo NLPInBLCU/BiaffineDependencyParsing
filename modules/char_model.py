@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_sequence, pad_packed_sequence, pack_padded_sequence, PackedSequence
 from .packed_lstm import PackedLSTM
-from common.model_utils import tensor_unsort
+from utils.model_utils import tensor_unsort
 
 
 class CharacterModel(nn.Module):

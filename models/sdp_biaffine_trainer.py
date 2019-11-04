@@ -5,13 +5,13 @@ A trainer class to handle training and testing of models.
 import torch
 
 # from deprecated_common.trainer import Trainer as BaseTrainer
-from common.model_utils.optimization import get_optimizer_old
-from common import model_utils
+from utils.model_utils.optimization import get_optimizer_old
+from utils import model_utils
 from .hdlstm_biaffine import Parser
-from common.input_utils.deprecated_common import MultiVocab
+from utils.input_utils.deprecated_common import MultiVocab
 # from model_utils.parser_funs import sdp_decoder, parse_semgraph
-from common.model_utils.optimization import BertAdam
-from common.logger import get_logger
+from utils.model_utils.optimization import BertAdam
+from utils.logger import get_logger
 from torch.utils.data import (DataLoader, RandomSampler)
 
 

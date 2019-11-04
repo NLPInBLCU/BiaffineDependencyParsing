@@ -13,9 +13,9 @@ from pytorch_transformers import (BertConfig,
                                   XLNetForSequenceClassification,
                                   XLNetTokenizer, BertModel)
 
-from common.information import debug_print
-from common.input_utils.bert.bert_input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
-from common.input_utils.graph_vocab import GraphVocab
+from utils.information import debug_print
+from utils.input_utils.bert.bert_input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
+from utils.input_utils.graph_vocab import GraphVocab
 from modules.layer_attention import LayerAttention
 from modules.transformer_layer import TransformerSentenceEncoderLayer
 
@@ -28,6 +28,13 @@ BERT_MODEL_CLASSES = {
 
 
 def batched_index_select(t, dim, inds):
+    """
+        实现batch版本的index select
+    :param t:
+    :param dim:
+    :param inds:
+    :return:
+    """
     dummy = inds.unsqueeze(2).expand(inds.size(0), inds.size(1), t.size(2))
     out = t.gather(dim, dummy)  # b x e x f
     return out

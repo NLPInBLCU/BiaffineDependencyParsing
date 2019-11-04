@@ -7,7 +7,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+# 过时文件或者文件夹
 deprecated_*.py
 **/deprecated_*
 

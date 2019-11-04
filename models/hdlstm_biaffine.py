@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence, PackedSequence
 
-from common.model_utils import make_unlabeltarget, make_labeltarget
+from utils.model_utils import make_unlabeltarget, make_labeltarget
 from modules.biaffine import DeepBiaffineScorer
 from modules.hlstm import HighwayLSTM
 from modules.char_model import CharacterModel
