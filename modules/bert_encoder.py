@@ -17,6 +17,7 @@ from common.information import debug_print
 from common.input_utils.bert.bert_input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
 from common.input_utils.graph_vocab import GraphVocab
 from modules.layer_attention import LayerAttention
+from modules.transformer_layer import TransformerSentenceEncoderLayer
 
 BERT_MODEL_CLASSES = {
     'bert': (BertConfig, BertModel, BertTokenizer),
@@ -37,11 +38,14 @@ class BERTTypeEncoder(nn.Module):
             self,
             local_rank=-1,
             no_cuda=False,
-            encoder_type='bert',
+            bertology='bert',
             bert_path='.',
             bert_output_mode='last',
             bert_chinese_word_embedding_select_mode='s',
             layer_dropout=0.1,
+            bert_after='none',
+            after_layers=0,
+            max_seq_len=None
     ):
         super().__init__()
         if local_rank == -1 or no_cuda:  # 单机(多卡)训练
@@ -53,7 +57,10 @@ class BERTTypeEncoder(nn.Module):
             # torch.distributed.init_process_group(backend='nccl')
             # self.n_gpu = 1
             raise RuntimeError('暂时不支持分布式训练')
-        self.bert_model_type = encoder_type.lower()
+        assert max_seq_len is not None, "必须指定max_seq_len"
+        self.max_seq_len = max_seq_len
+        self.bert_model_type = bertology.lower()
+        assert self.bert_model_type in BERT_MODEL_CLASSES.keys(), f'BERTology Only support {list(BERT_MODEL_CLASSES.keys())}'
         self.bert_model_path = bert_path
         self.bert_config_class, self.bert_model_class, _ = BERT_MODEL_CLASSES[self.bert_model_type]
         self.bert_config = self.bert_config_class.from_pretrained(self.bert_model_path)
@@ -70,6 +77,19 @@ class BERTTypeEncoder(nn.Module):
                                                   dropout=layer_dropout)
         else:
             self.layer_attention = None
+        if bert_after.lower() != 'none':
+            assert bert_after.lower() in ['transformer']
+            assert after_layers > 0
+        if bert_after.lower() == 'transformer':
+            self.after_encoder = nn.ModuleList(
+                [
+                    TransformerSentenceEncoderLayer(embedding_dim=self.bert_config.hidden_size)
+                    for _ in range(after_layers)
+                ]
+            )
+        else:
+            self.after_encoder = None
+
         # debug_print('BERT config:')
         # debug_print(self.config)
         # self.model.to(self.device)
@@ -123,6 +143,16 @@ class BERTTypeEncoder(nn.Module):
             encoder_output /= 2
         elif self.bert_chinese_word_embedding_select_mode == 's-e':
             raise NotImplementedError('not support this select mode')
+        # transformer输入需要attention pad，也就是需要指出哪些是pad的输入
+        # 注意这里不能直接使用attention mask作为transformer的输入，这是因为attention mask是原来的字序列的mask
+        # 这里我们需要词序列的mask：
+        word_attention_pad_mask = torch.eq(start_pos, self.max_seq_len - 1)
+        # 确保pad位置向量为0
+        encoder_output *= 1 - word_attention_pad_mask.unsqueeze(-1).type_as(encoder_output)
+        if self.after_encoder is not None:
+            for layer in self.after_encoder:
+                encoder_output, _ = layer(encoder_output, self_attn_padding_mask=word_attention_pad_mask)
+
         return self.dropout(encoder_output)
 
 

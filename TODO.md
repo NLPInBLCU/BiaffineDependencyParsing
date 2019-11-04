@@ -20,7 +20,7 @@
 - [ ] 支持tensorboardX
 - [ ] 支持句法依存分析
 - [ ] BERT后添加一个self-attention层
-- [ ] 加入Layer Attention、Layer Dropout
+- [x] 加入Layer Attention、Layer Dropout
 - [ ] Input Masking
 - [ ] inverse square root learning rate decay (Vaswani et al., 2017). 
 - [ ] 多任务训练 text/news分成两个decoder一起训练（此时训练集也得分开）

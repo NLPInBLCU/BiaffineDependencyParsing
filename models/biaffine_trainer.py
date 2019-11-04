@@ -92,7 +92,8 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         best_result = BestResult()
         self.model.zero_grad()
         set_seed(self.args)  # Added here for reproductibility (even between python 2 and 3)
-        for epoch in range(self.args.max_train_epochs):
+        train_stop = False
+        for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
             train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}')
             for step, batch in enumerate(train_data_loader):
@@ -124,14 +125,20 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                     print(f'\n## Early stop in step:{global_step} ##')
                     print("\n## BEST RESULT in Training ##")
                     print(best_result)
-                    return
+                    train_stop = True
+                    break
 
                 if global_step > self.args.max_steps:
                     print(f'\n## Train Stop in step:{global_step} ##')
                     print("\n## BEST RESULT in Training ##")
                     print(best_result)
-                    return
-            print(f'\n- Epoch {epoch + 1} average loss : {epoch_ave_loss / len(train_data_loader)}')
+                    train_stop = True
+                    break
+            if train_stop:
+                with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
+                    f.write(str(best_result) + '\n')
+                return
+            print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
 
     def dev(self, dev_data_loader, dev_CoNLLU_file):
         assert isinstance(dev_CoNLLU_file, CoNLLFile)
@@ -159,8 +166,8 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
             # batch_sent_lens += sent_lens
 
         dev_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
-        dev_CoNLLU_file.write_conll(self.args.dev_output_file)
-        UAS, LAS = sdp_scorer.score(self.args.dev_output_file, os.path.join(self.args.data_dir, self.args.dev_file))
+        dev_CoNLLU_file.write_conll(self.args.dev_output_path)
+        UAS, LAS = sdp_scorer.score(self.args.dev_output_path, os.path.join(self.args.data_dir, self.args.dev_file))
         return UAS, LAS
 
     def inference(self, inference_data_loader, inference_CoNLLU_file):
@@ -178,7 +185,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                                                                calc_loss=False, update=False, calc_prediction=True)
             predictions += batch_prediction
         inference_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
-        inference_CoNLLU_file.write_conll(self.args.inference_output_file)
+        inference_CoNLLU_file.write_conll(self.args.test_output_path)
         return predictions
 
 

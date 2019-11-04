@@ -63,7 +63,8 @@ def parse_semgraph(semgraph, sentlens):
         for w in s[1:l]:
             arc = []
             for head_idx, deprel in enumerate(w[:l]):
-                if deprel == 0: continue
+                if deprel == 0:
+                    continue
                 arc.append([head_idx, deprel - 1])
             words.append(arc)
         sents.append(words)

@@ -7,7 +7,7 @@
    date：          2019/7/28
 -------------------------------------------------
    Change Activity:
-                   2019/7/28:
+                   2019/10/29:
 -------------------------------------------------
 """
 import os
@@ -53,7 +53,8 @@ def main():
 
     with Timer('load input'):
         train_data_loader, train_conllu, dev_data_loader, dev_conllu, _, _ = load_input(args,
-                                                                                        train=True, dev=True,
+                                                                                        train=True,
+                                                                                        dev=True,
                                                                                         test=False)
     print(f'train batch size: {args.train_batch_size}')
     print(f'train data batch num: {len(train_data_loader)}')
@@ -93,6 +94,11 @@ def make_output_dir(args):
         shutil.copyfile(args.config_file, str(output_dir / pathlib.Path(args.config_file).name))
         (output_dir / 'saved_models').mkdir()
         args.output_dir = str(output_dir)
+        args.dev_output_path = str(output_dir / 'dev_output_conllu.txt')
+        args.dev_result_path = str(output_dir / 'dev_best_metrics.txt')
+        args.test_output_path = str(output_dir / 'test_output_conllu.txt')
+        args.test_result_path = str(output_dir / 'test_metrics.txt')
+        args.save_model_dir = str(output_dir / 'saved_models')
 
 
 if __name__ == '__main__':
