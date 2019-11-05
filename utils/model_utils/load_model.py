@@ -10,7 +10,7 @@
                    2019/8/5:
 -------------------------------------------------
 """
-from models.hdlstm_biaffine import HDLSTMBiaffine
+from models.deprecated_hdlstm_biaffine import HDLSTMBiaffine
 from utils.model_utils import LSTMModelWrapper
 
 

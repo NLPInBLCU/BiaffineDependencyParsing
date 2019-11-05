@@ -10,5 +10,7 @@
                    2019/7/29:
 -------------------------------------------------
 """
+
+
 class TransformerBiaffine(object):
-    pass
+    raise NotImplementedError('')

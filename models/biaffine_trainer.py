@@ -134,20 +134,15 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                     print(f'\n## Early stop in step:{global_step} ##')
                     train_stop = True
                     break
-
-                if global_step > self.args.max_steps:
-                    print(f'\n## Train Stop in step:{global_step} ##')
-                    train_stop = True
-                    break
             if train_stop:
-                with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
-                    f.write(str(best_result) + '\n')
-                print("\n## BEST RESULT in Training ##")
-                print(best_result)
-                summary_writer.close()
-                return
+                break
             # print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
             summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
+        with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
+            f.write(str(best_result) + '\n')
+        print("\n## BEST RESULT in Training ##")
+        print(best_result)
+        summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file):
         assert isinstance(dev_CoNLLU_file, CoNLLFile)

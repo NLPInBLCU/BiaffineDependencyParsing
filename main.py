@@ -62,12 +62,15 @@ def main():
     # 每个epoch做两次dev：
     args.eval_interval = len(train_data_loader) // 2
     print(f'eval interval: {args.eval_interval}')
-    # 最多过100个epoch, 注意该参数影响学习率warm up
-    args.max_steps = len(train_data_loader) * 100
-    print(f'max steps: {args.max_steps}')
+    # 注意该参数影响学习率warm up
+    args.max_train_steps = len(train_data_loader) * args.max_train_epochs
+    print(f'max steps: {args.max_train_steps}')
     # 如果6个epoch之后仍然不能提升，就停止
-    args.early_stop_steps = len(train_data_loader) * 6
-    print(f'early stop steps: {args.early_stop_steps}\n')
+    if args.early_stop:
+        args.early_stop_steps = len(train_data_loader) * args.early_stop_epochs
+        print(f'early stop steps: {args.early_stop_steps}\n')
+    else:
+        print(f'do not use early stop, training will last {args.max_train_epochs} epochs')
 
     with Timer('load trainer'):
         trainer = load_trainer(args)
