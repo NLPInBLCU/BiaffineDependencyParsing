@@ -11,7 +11,7 @@ run:
   run_mode: 'train'
   #只需要指定最大的epoch数量，不需要指定最大steps
   #可能的选择：80,150
-  max_train_epochs: 150
+  max_train_epochs: 80
   eval_interval: 100
   early_stop: false
   early_stop_epochs: 6
@@ -47,8 +47,8 @@ BERT:
   root_representation: 'unused'
   #中文单词的提取方式：s,e,s+e,s-e
   bert_chinese_word_select: 'e'
-  #BERT输出的选择方式：last,last_four_sum,last_four_cat,all_sum
-  bert_output_mode: 'attention'
+  #BERT输出的选择方式：last,last_four_sum,last_four_cat,all_sum,attention
+  bert_output_mode: 'last_four_sum'
   bert_after: 'transformer'
   after_layers: 2
   after_dropout: 0.2
