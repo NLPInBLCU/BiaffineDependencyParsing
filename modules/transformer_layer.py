@@ -13,6 +13,7 @@ from fairseq.modules import (
     LayerNorm,
     MultiheadAttention,
 )
+from utils.model_utils.initialization import init_bert_params
 
 
 class TransformerSentenceEncoderLayer(nn.Module):
@@ -62,6 +63,8 @@ class TransformerSentenceEncoderLayer(nn.Module):
 
         # layer norm associated with the position wise feed-forward NN
         self.final_layer_norm = LayerNorm(self.embedding_dim, export=export)
+
+        self.apply(init_bert_params)
 
     def forward(
             self,

@@ -165,7 +165,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
                                  pad_token=0,
                                  pad_token_segment_id=0,
                                  sequence_a_segment_id=0,
-                                 sequence_b_segment_id=1,
+                                 # sequence_b_segment_id=1,
                                  mask_padding_with_zero=True,
                                  skip_too_long_input=True):
     """ Loads a data file into a list of `InputBatch`s
@@ -175,7 +175,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
         `cls_token_segment_id` define the segment id associated to the CLS token (0 for BERT, 2 for XLNet)
     """
     assert not cls_token_at_end, "CLS必须在句首，目前不支持xlnet"
-
+    assert not pad_on_left, "PAD必须在句子右侧，目前不支持xlnet"
     features = []
     skip_input_num = 0
     for (ex_index, example) in enumerate(examples):
@@ -189,7 +189,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
 
         # Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
         special_tokens_count = 3 if sep_token_extra else 2
-        # 为ROOT表示等预留足够的空间
+        # 为ROOT表示等预留足够的空间(目前至少预留5个位置)
         special_tokens_count += 3
         if len(tokens_a) > max_seq_length - special_tokens_count:
             if skip_too_long_input:
@@ -250,14 +250,26 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
             input_ids = ([pad_token] * padding_length) + input_ids
             input_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + input_mask
             segment_ids = ([pad_token_segment_id] * padding_length) + segment_ids
+            # 由于batched_index_select的限制，position idx的pad不能为-1
+            # 如果为0的话，又容易和CLS重复，
+            # 所以这里选择用max_seq_length-1表示PAD
+            # 注意这里max_seq_length至少应该大于实际句长（以字数统计）3到4个位置
             start_pos = ([max_seq_length - 1] * pos_padding_length) + start_pos
             end_pos = ([max_seq_length - 1] * pos_padding_length) + end_pos
+            assert start_pos[0] == max_seq_length - 1
+            assert end_pos[0] == max_seq_length - 1
         else:
             input_ids = input_ids + ([pad_token] * padding_length)
             input_mask = input_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
             segment_ids = segment_ids + ([pad_token_segment_id] * padding_length)
+            # 由于batched_index_select的限制，position idx的pad不能为-1
+            # 如果为0的话，又容易和CLS重复，
+            # 所以这里选择用max_seq_length-1表示PAD
+            # 注意这里max_seq_length至少应该大于实际句长（以字数统计）3到4个位置
             start_pos = start_pos + ([max_seq_length - 1] * pos_padding_length)
             end_pos = end_pos + ([max_seq_length - 1] * pos_padding_length)
+            assert start_pos[-1] == max_seq_length - 1
+            assert end_pos[-1] == max_seq_length - 1
         # print(end_pos)
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
@@ -437,6 +449,7 @@ if __name__ == '__main__':
             self.encoder_type = 'bert'
             self.root_representation = 'unused'
             self.device = 'cpu'
+            self.skip_too_long_input = False
 
 
     args = Args()
@@ -447,16 +460,16 @@ if __name__ == '__main__':
     vocab = GraphVocab('/home/liangs/codes/doing_codes/CSDP_Biaffine_Parser/dataset/graph_vocab.txt')
     dataset, CoNLLU_file, _, _, _, _ = load_and_cache_examples(args, vocab, tokenizer, train=True, dev=False,
                                                                test=False)
-    data_loader = get_data_loader(dataset, 3, evaluation=True)
+    data_loader = get_data_loader(dataset, 1, evaluation=True)
     # 原始输入句子
     print(CoNLLU_file.get(['word'], as_sentences=True))
     for batch in data_loader:
         # input ids:
-        print(batch[0])
+        # print(batch[0])
         # input mask:
-        print(batch[1])
+        # print(batch[1])
         # start pos:
-        print(batch[3])
+        # print(batch[3])
         # labeled target
         print(batch[-1])
         # unlabeled target

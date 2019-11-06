@@ -17,7 +17,11 @@ class BiaffineDependencyModel(nn.Module):
             self.encoder = BERTTypeEncoder(no_cuda=not args.cuda,
                                            bert_path=args.bert_path,
                                            bert_chinese_word_embedding_select_mode=args.bert_chinese_word_select,
-                                           bert_output_mode=args.bert_output_mode)
+                                           bert_output_mode=args.bert_output_mode,
+                                           max_seq_len=args.max_seq_len,
+                                           bert_after=args.bert_after,
+                                           after_layers=args.after_layers,
+                                           after_dropout=args.after_dropout)
         elif args.encoder_type in ['lstm', 'gru']:
             self.encoder = None  # Do NOT support now #todo
         elif args.encoder_type == 'transformer':

@@ -1,15 +1,21 @@
-run: 
+# yaml 格式说明：
+# （1）注意空格！yaml格式非常严格。双空格开头，冒号后必须有一个空格
+# （2）字符串用单引号引起来
+# （3）浮点数或者科学计数法必须用小数点（否则可能被当做字符串）
+# （4）布尔类型：true，false
+run:
   cuda: true
   cpu: false
   seed: 1234
   #执行模型：train,dev,inference
   run_mode: 'train'
-  max_steps: 20000
-  max_train_epochs: 150
+  #只需要指定最大的epoch数量，不需要指定最大steps
+  #可能的选择：80,150
+  max_train_epochs: 80
   eval_interval: 100
-  early_stop: true
-  early_stop_steps: 4000
-data_set: 
+  early_stop: false
+  early_stop_epochs: 6
+data_set:
   data_dir: 'dataset'
   train_file: 'train/text_news.train.conllu'
   dev_file: 'dev/sdp_text_dev.conllu'
@@ -20,11 +26,10 @@ data_set:
   per_gpu_eval_batch_size: 10
   skip_too_long_input: true
 output:
-  saved_model_dir: 'checkpoints'
-  save_name: 'bert'
-  dev_output_file: 'output/exam1.conllu'
-  best_result_file: 'output/exam1.best.text'
-graph_vocab: 
+  output_dir: 'output'
+  log_name: 'parser'
+  save_best_model: false
+graph_vocab:
   #依存弧的vocab，必须提前生成
   graph_vocab_file: 'dataset/graph_vocab.txt'
 encoder: 
@@ -35,28 +40,35 @@ CharRNN:
 Transformer: 
 BERT: 
   #bert 模型的文件路径
-  bert_path: /data/private/lhy/data/bert_pretrained_model/bert-base-chinese/
-  #最大长度 必须超过数据集的最大长度（字数）,256比较合适，新闻领域的最大句长可达233
+  bert_path: '/data/private/lhy/data/bert_pretrained_model/bert-base-chinese/'
+  #最大长度 必须超过数据集的最大长度（字数）,新闻领域的最大句长可达233
   max_seq_len: 100
   #ROOT的表示形式：unused,cls,root ....
   root_representation: 'unused'
   #中文单词的提取方式：s,e,s+e,s-e
   bert_chinese_word_select: 'e'
-  #BERT输出的选择方式：last,last_four_sum,last_four_cat,all_sum
-  bert_output_mode: 'last'
+  #BERT输出的选择方式：last,last_four_sum,last_four_cat,all_sum,attention
+  bert_output_mode: 'last_four_sum'
+  bert_after: 'transformer'
+  after_layers: 2
+  after_dropout: 0.2
 decoder: 
   biaffine_hidden_dim: 600
-  biaffine_dropout: 0.1
+  biaffine_dropout: 0.33
+  direct_biaffine: false
 update: 
   learned_loss_ratio: true
   label_loss_ratio: 0.5
-  max_grad_norm: 1.0
-  optimizer: 'adamw'
-  beta1: 0
-  beta2: 0.95
-  L2_penalty: 3.0e-9
+  max_grad_norm: 5.0
+  # adam-bert (huggingface版本的adamw); adamw-torch (torch 1.2); adam;
+  optimizer: 'adamw-bert'
+  beta1: 0.9
+  beta2: 0.99
   eps: 1.0e-12
-  weight_decay: 0.0
+  weight_decay: 3.0e-9
   learning_rate: 5.0e-5
+  # bertDistill:1.0e-6;
   adam_epsilon: 1.0e-8
-  warmup_steps: 0
+  # bertDistill:0.05;
+  warmup_prop: 0.05
+  average_loss_by_words_num: true

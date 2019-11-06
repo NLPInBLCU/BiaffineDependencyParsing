@@ -15,6 +15,11 @@ import utils.model_utils.sdp_simple_scorer as sdp_scorer
 from utils.best_result import BestResult
 from utils.seed import set_seed
 
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ImportError:
+    from tensorboardX import SummaryWriter
+
 
 class BiaffineDependencyTrainer(metaclass=ABCMeta):
     def __init__(self, args, model):
@@ -33,18 +38,23 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         """
         raise NotImplementedError('must implement in sub class')
 
-    def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_mask,
+    def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_pad_mask,
                             label_loss_ratio=None, sentence_lengths=None,
                             calc_loss=True, update=True, calc_prediction=False):
         """
             针对一个batch输入：计算loss，反向传播，计算预测结果
+            :param word_pad_mask: 以word为单位，1为PAD，0为真实输入
         :return:
         """
-        weights = torch.ones(word_mask.size(0), self.args.max_seq_len, self.args.max_seq_len,
+        weights = torch.ones(word_pad_mask.size(0), self.args.max_seq_len, self.args.max_seq_len,
                              dtype=unlabeled_scores.dtype,
                              device=unlabeled_scores.device)
-        weights = weights.masked_fill(word_mask.unsqueeze(1), 0)
-        weights = weights.masked_fill(word_mask.unsqueeze(2), 0)
+        # 将PAD的位置权重设为0，其余位置为1
+        weights = weights.masked_fill(word_pad_mask.unsqueeze(1), 0)
+        weights = weights.masked_fill(word_pad_mask.unsqueeze(2), 0)
+        # words_num 记录batch中的单词数量
+        # torch.eq(word_pad_mask, False) 得到word_mask
+        words_num = torch.sum(torch.eq(word_pad_mask, False)).item()
         if calc_loss:
             assert label_loss_ratio
             assert unlabeled_target is not None and labeled_target is not None
@@ -61,6 +71,9 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
 
             if self.args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
+
+            if self.args.average_loss_by_words_num:
+                loss = loss / words_num
 
             if update:
                 loss.backward()
@@ -92,21 +105,25 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         best_result = BestResult()
         self.model.zero_grad()
         set_seed(self.args)  # Added here for reproductibility (even between python 2 and 3)
-        for epoch in range(self.args.max_train_epochs):
+        train_stop = False
+        summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
+        for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
             train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}')
             for step, batch in enumerate(train_data_loader):
                 batch = tuple(t.to(self.args.device) for t in batch)
                 self.model.train()
                 # debug_print(batch)
+                # word_mask:以word为单位，1为真实输入，0为PAD
                 inputs, word_mask, _, dep_ids = self._unpack_batch(self.args, batch)
-                word_mask = torch.eq(word_mask, 0)
+                # word_pad_mask:以word为单位，1为PAD，0为真实输入
+                word_pad_mask = torch.eq(word_mask, 0)
                 unlabeled_scores, labeled_scores = self.model(inputs)
                 labeled_target = dep_ids
                 unlabeled_target = labeled_target.ge(1).to(unlabeled_scores.dtype)
                 # Calc loss and update:
                 loss, _ = self._update_and_predict(unlabeled_scores, labeled_scores, unlabeled_target, labeled_target,
-                                                   word_mask,
+                                                   word_pad_mask,
                                                    label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
                                                    calc_loss=True, update=True, calc_prediction=False)
                 global_step += 1
@@ -114,24 +131,28 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                     epoch_ave_loss += loss
 
                 if global_step % self.args.eval_interval == 0:
+                    summary_writer.add_scalar('loss/train', loss, global_step)
                     if dev_data_loader:
                         UAS, LAS = self.dev(dev_data_loader, dev_CoNLLU_file)
+                        summary_writer.add_scalar('metrics/uas', UAS, global_step)
+                        summary_writer.add_scalar('metrics/las', LAS, global_step)
                         if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
                             print(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             print(best_result)
 
                 if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
                     print(f'\n## Early stop in step:{global_step} ##')
-                    print("\n## BEST RESULT in Training ##")
-                    print(best_result)
-                    return
-
-                if global_step > self.args.max_steps:
-                    print(f'\n## Train Stop in step:{global_step} ##')
-                    print("\n## BEST RESULT in Training ##")
-                    print(best_result)
-                    return
-            print(f'\n- Epoch {epoch + 1} average loss : {epoch_ave_loss / len(train_data_loader)}')
+                    train_stop = True
+                    break
+            if train_stop:
+                break
+            # print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
+            summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
+        with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
+            f.write(str(best_result) + '\n')
+        print("\n## BEST RESULT in Training ##")
+        print(best_result)
+        summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file):
         assert isinstance(dev_CoNLLU_file, CoNLLFile)
@@ -159,8 +180,8 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
             # batch_sent_lens += sent_lens
 
         dev_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
-        dev_CoNLLU_file.write_conll(self.args.dev_output_file)
-        UAS, LAS = sdp_scorer.score(self.args.dev_output_file, os.path.join(self.args.data_dir, self.args.dev_file))
+        dev_CoNLLU_file.write_conll(self.args.dev_output_path)
+        UAS, LAS = sdp_scorer.score(self.args.dev_output_path, os.path.join(self.args.data_dir, self.args.dev_file))
         return UAS, LAS
 
     def inference(self, inference_data_loader, inference_CoNLLU_file):
@@ -178,7 +199,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                                                                calc_loss=False, update=False, calc_prediction=True)
             predictions += batch_prediction
         inference_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
-        inference_CoNLLU_file.write_conll(self.args.inference_output_file)
+        inference_CoNLLU_file.write_conll(self.args.test_output_path)
         return predictions
 
 
@@ -192,6 +213,7 @@ class BERTBiaffineTrainer(BiaffineDependencyTrainer):
             'end_pos': batch[4],
         }
         dep_ids = batch[5]
+        # word_mask:以word为单位，1为真实输入，0为PAD
         word_mask = (batch[3] != (args.max_seq_len - 1)).to(torch.long).to(args.device)
         sent_len = torch.sum(word_mask, 1).cpu().tolist()
         return inputs, word_mask, sent_len, dep_ids
