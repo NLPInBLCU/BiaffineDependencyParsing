@@ -52,7 +52,8 @@ class BERTTypeEncoder(nn.Module):
             layer_dropout=0.1,
             bert_after='none',
             after_layers=0,
-            max_seq_len=None
+            max_seq_len=None,
+            after_dropout=0.1,
     ):
         super().__init__()
         if local_rank == -1 or no_cuda:  # 单机(多卡)训练
@@ -90,7 +91,8 @@ class BERTTypeEncoder(nn.Module):
         if bert_after.lower() == 'transformer':
             self.after_encoder = nn.ModuleList(
                 [
-                    TransformerSentenceEncoderLayer(embedding_dim=self.bert_config.hidden_size)
+                    TransformerSentenceEncoderLayer(embedding_dim=self.bert_config.hidden_size,
+                                                    dropout=after_dropout)
                     for _ in range(after_layers)
                 ]
             )
@@ -104,19 +106,20 @@ class BERTTypeEncoder(nn.Module):
     def forward(self, input_ids, token_type_ids=None, attention_mask=None,
                 position_ids=None, head_mask=None, end_pos=None, start_pos=None):
         # BERT model output:
-        #         **last_hidden_state**: ``torch.FloatTensor`` of shape ``(batch_size, sequence_length, hidden_size)``
+        #         0 **last_hidden_state**: ``torch.FloatTensor`` of shape ``(batch_size, sequence_length, hidden_size)``
         #             Sequence of hidden-states at the output of the last layer of the model.
-        #         **pooler_output**: ``torch.FloatTensor`` of shape ``(batch_size, hidden_size)``
-        #         **hidden_states**: (`optional`, returned when ``config.output_hidden_states=True``)
+        #         1 **pooler_output**: ``torch.FloatTensor`` of shape ``(batch_size, hidden_size)``
+        #         2 **hidden_states**: (`optional`, returned when ``config.output_hidden_states=True``)
         #             list of ``torch.FloatTensor`` (one for the output of each layer + the output of the embeddings)
         #             of shape ``(batch_size, sequence_length, hidden_size)``:
         #             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        #         **attentions**: (`optional`, returned when ``config.output_attentions=True``)
+        #         3 **attentions**: (`optional`, returned when ``config.output_attentions=True``)
         bert_outputs = self.bert(input_ids, position_ids=position_ids,
                                  token_type_ids=token_type_ids,
                                  attention_mask=attention_mask, head_mask=head_mask)
         last_layer_hidden_state = bert_outputs[0]
-        all_layers_hidden_states = bert_outputs[2]
+        # hidden_states:one for the output of each layer + the output of the embeddings
+        all_layers_hidden_states = bert_outputs[2][1:]
         assert torch.all(all_layers_hidden_states[-1] == last_layer_hidden_state)
         # Which vector works best as a contextualized embedding? http://jalammar.github.io/illustrated-bert/
         if self.bert_output_mode == 'last':
@@ -131,8 +134,8 @@ class BERTTypeEncoder(nn.Module):
             all_hidden_states = torch.stack(all_layers_hidden_states)
             encoder_output = torch.sum(all_hidden_states, 0)
         elif self.bert_output_mode == 'attention':
-            all_hidden_states = torch.stack(all_layers_hidden_states)
-            encoder_output = self.layer_attention(all_hidden_states, attention_mask)
+            # all_hidden_states = torch.stack(all_layers_hidden_states)
+            encoder_output = self.layer_attention(all_layers_hidden_states, attention_mask)
         else:
             raise Exception('bad bert output mode')
         # mask:
@@ -157,9 +160,12 @@ class BERTTypeEncoder(nn.Module):
         # 确保pad位置向量为0
         encoder_output *= 1 - word_attention_pad_mask.unsqueeze(-1).type_as(encoder_output)
         if self.after_encoder is not None:
+            # batch X Seq_len X dim -> Seq_len X batch X dim
+            encoder_output = encoder_output.transpose(0, 1)
             for layer in self.after_encoder:
                 encoder_output, _ = layer(encoder_output, self_attn_padding_mask=word_attention_pad_mask)
-
+            # Seq_len X batch X dim -> batch X Seq_len X dim
+            encoder_output = encoder_output.transpose(0, 1)
         return self.dropout(encoder_output)
 
 

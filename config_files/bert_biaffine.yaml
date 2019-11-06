@@ -51,6 +51,7 @@ BERT:
   bert_output_mode: 'attention'
   bert_after: 'transformer'
   after_layers: 2
+  after_dropout: 0.2
 decoder: 
   biaffine_hidden_dim: 600
   biaffine_dropout: 0.33
@@ -58,15 +59,16 @@ decoder:
 update: 
   learned_loss_ratio: true
   label_loss_ratio: 0.5
-  max_grad_norm: 2.0
+  max_grad_norm: 5.0
   # adam-bert (huggingface版本的adamw); adamw-torch (torch 1.2); adam;
   optimizer: 'adamw-bert'
-  beta1: 0
-  beta2: 0.95
-  L2_penalty: 3.0e-9
+  beta1: 0.9
+  beta2: 0.99
   eps: 1.0e-12
-  weight_decay: 0.0
+  weight_decay: 3.0e-9
   learning_rate: 5.0e-5
+  # bertDistill:1.0e-6;
   adam_epsilon: 1.0e-8
+  # bertDistill:0.05;
   warmup_prop: 0.05
-  average_loss: true
+  average_loss_by_words_num: true

@@ -38,18 +38,23 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         """
         raise NotImplementedError('must implement in sub class')
 
-    def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_mask,
+    def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_pad_mask,
                             label_loss_ratio=None, sentence_lengths=None,
                             calc_loss=True, update=True, calc_prediction=False):
         """
             针对一个batch输入：计算loss，反向传播，计算预测结果
+            :param word_pad_mask: 以word为单位，1为PAD，0为真实输入
         :return:
         """
-        weights = torch.ones(word_mask.size(0), self.args.max_seq_len, self.args.max_seq_len,
+        weights = torch.ones(word_pad_mask.size(0), self.args.max_seq_len, self.args.max_seq_len,
                              dtype=unlabeled_scores.dtype,
                              device=unlabeled_scores.device)
-        weights = weights.masked_fill(word_mask.unsqueeze(1), 0)
-        weights = weights.masked_fill(word_mask.unsqueeze(2), 0)
+        # 将PAD的位置权重设为0，其余位置为1
+        weights = weights.masked_fill(word_pad_mask.unsqueeze(1), 0)
+        weights = weights.masked_fill(word_pad_mask.unsqueeze(2), 0)
+        # words_num 记录batch中的单词数量
+        # torch.eq(word_pad_mask, False) 得到word_mask
+        words_num = torch.sum(torch.eq(word_pad_mask, False)).item()
         if calc_loss:
             assert label_loss_ratio
             assert unlabeled_target is not None and labeled_target is not None
@@ -66,6 +71,9 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
 
             if self.args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
+
+            if self.args.average_loss_by_words_num:
+                loss = loss / words_num
 
             if update:
                 loss.backward()
@@ -106,14 +114,16 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                 batch = tuple(t.to(self.args.device) for t in batch)
                 self.model.train()
                 # debug_print(batch)
+                # word_mask:以word为单位，1为真实输入，0为PAD
                 inputs, word_mask, _, dep_ids = self._unpack_batch(self.args, batch)
-                word_mask = torch.eq(word_mask, 0)
+                # word_pad_mask:以word为单位，1为PAD，0为真实输入
+                word_pad_mask = torch.eq(word_mask, 0)
                 unlabeled_scores, labeled_scores = self.model(inputs)
                 labeled_target = dep_ids
                 unlabeled_target = labeled_target.ge(1).to(unlabeled_scores.dtype)
                 # Calc loss and update:
                 loss, _ = self._update_and_predict(unlabeled_scores, labeled_scores, unlabeled_target, labeled_target,
-                                                   word_mask,
+                                                   word_pad_mask,
                                                    label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
                                                    calc_loss=True, update=True, calc_prediction=False)
                 global_step += 1
@@ -203,6 +213,7 @@ class BERTBiaffineTrainer(BiaffineDependencyTrainer):
             'end_pos': batch[4],
         }
         dep_ids = batch[5]
+        # word_mask:以word为单位，1为真实输入，0为PAD
         word_mask = (batch[3] != (args.max_seq_len - 1)).to(torch.long).to(args.device)
         sent_len = torch.sum(word_mask, 1).cpu().tolist()
         return inputs, word_mask, sent_len, dep_ids

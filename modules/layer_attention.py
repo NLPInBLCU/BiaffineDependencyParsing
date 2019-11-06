@@ -77,6 +77,7 @@ class LayerAttention(torch.nn.Module):
 
         When ``do_layer_norm=False`` the ``mask`` is ignored.
         """
+        assert isinstance(tensors, list) or isinstance(tensors, tuple), type(tensors)
         if len(tensors) != self.mixture_size:
             raise ValueError("{} tensors were passed, but the module was initialized to "
                              "mix {} tensors.".format(len(tensors), self.mixture_size))
