@@ -88,7 +88,7 @@ def config_for_multi_gpu(args):
 def make_output_dir(args):
     output_dir = pathlib.Path(args.output_dir)
     assert output_dir.is_dir()
-    time_str = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
+    time_str = datetime.now().strftime('_%Y-%m-%d-%H-%M-%S')
     output_dir = output_dir / (pathlib.Path(args.config_file).stem + time_str)
     if output_dir.exists():
         raise RuntimeError(f'{output_dir} exists! (maybe file or dir)')

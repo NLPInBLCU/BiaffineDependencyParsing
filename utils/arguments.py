@@ -24,6 +24,8 @@ def parse_args():
     for sub_dict in yaml_config.values():
         if sub_dict:
             for k, v in sub_dict.items():
+                if k in args_dict.keys():
+                    raise ValueError(f'Duplicate parameter : {k}')
                 args_dict[k] = v
     args_dict['config_file'] = args.config_file
     # device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
