@@ -20,7 +20,7 @@ from datetime import datetime
 from utils.arguments import parse_args
 from models.biaffine_trainer import BERTBiaffineTrainer
 from models.biaffine_model import BiaffineDependencyModel
-from utils.input_utils.bert.bert_input_utils import load_input
+from utils.input_utils.bertology.bert_input_utils import load_input
 from utils.input_utils.graph_vocab import GraphVocab
 from utils.seed import set_seed
 from utils.timer import Timer
@@ -28,7 +28,7 @@ from utils.logger import init_logger, get_logger
 
 
 def load_trainer(args):
-    model = BiaffineDependencyModel(args)
+    model = BiaffineDependencyModel.from_pretrained(args, initialize_from_bertology=True)
     model.to(args.device)
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:

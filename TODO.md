@@ -12,9 +12,9 @@
 - [x] dev数据集上调优
 - [x] 按照单词数量均分loss
 - [x] 调整BERT 优化器的参数
+- [x] 保存、加载
 ## High Priority
 - [ ] 调整学习率、最大步数、warmup prop
-- [ ] 保存、加载
 - [ ] Input Masking
 - [ ] 多领域数据的采样（参考多语BERT）
 - [ ] 多任务训练 + POS 标注

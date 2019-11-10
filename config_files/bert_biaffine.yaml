@@ -32,24 +32,25 @@ output:
 graph_vocab:
   #依存弧的vocab，必须提前生成
   graph_vocab_file: 'dataset/graph_vocab.txt'
+Model:
+  saved_model_path: '/data/private/lhy/data/baidu_ERNIE/'
 encoder: 
-  #encoder的类型：bert,transformer,lstm ....
-  encoder_type: 'bert'
+  #encoder的类型：bertology,transformer,lstm ....
+  encoder_type: 'bertology'
   encoder_output_dim: 768
 CharRNN: 
 Transformer: 
 BERT: 
-  #bert 模型的文件路径
-  bert_path: '/data/private/lhy/data/bert_pretrained_model/bert-base-chinese/'
   #最大长度 必须超过数据集的最大长度（字数）,新闻领域的最大句长可达233
+  bertology_type: 'bertology'
   max_seq_len: 100
   #ROOT的表示形式：unused,cls,root ....
   root_representation: 'unused'
   #中文单词的提取方式：s,e,s+e,s-e
-  bert_chinese_word_select: 'e'
+  bertology_word_select: 'e'
   #BERT输出的选择方式：last,last_four_sum,last_four_cat,all_sum,attention
-  bert_output_mode: 'last_four_sum'
-  bert_after: 'transformer'
+  bertology_output_mode: 'last_four_sum'
+  bertology_after: 'transformer'
   after_layers: 2
   after_dropout: 0.2
 decoder: 
@@ -63,8 +64,8 @@ update:
   loss_scaling_ratio: 2
   label_smoothing: 0.03
   max_grad_norm: 5.0
-  # adam-bert (huggingface版本的adamw); adamw-torch (torch 1.2); adam;
-  optimizer: 'adamw-bert'
+  # adam-bertology (huggingface版本的adamw); adamw-torch (torch 1.2); adam;
+  optimizer: 'adamw-bertology'
   beta1: 0.9
   beta2: 0.99
   eps: 1.0e-12

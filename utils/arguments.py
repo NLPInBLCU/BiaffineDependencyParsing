@@ -35,10 +35,6 @@ def parse_args():
     if args.skip_too_long_input:
         print(f'skip_too_long_input is True, max_seq_len is {args.max_seq_len}')
 
-    if args.encoder_type == 'bert':
-        if not os.path.isdir(args.bert_path):
-            raise ValueError(f'{args.bert_path} is not a dir or not exist !')
-
     return args
 
 
