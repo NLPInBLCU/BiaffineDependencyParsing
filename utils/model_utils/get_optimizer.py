@@ -23,7 +23,7 @@ def get_optimizer_old(name, parameters, lr, betas=(0.9, 0.999), eps=1e-8, weight
 
 def get_optimizer(args, model):
     args.warmup_steps = math.ceil(args.warmup_prop * args.max_train_steps)
-    if args.optimizer == 'adamw-bert':
+    if args.optimizer == 'adamw-bertology':
         no_decay = ['bias', 'LayerNorm.weight']
         optimizer_grouped_parameters = [
             {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],

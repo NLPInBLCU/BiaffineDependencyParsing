@@ -14,6 +14,8 @@ from utils.model_utils.parser_funs import sdp_decoder, parse_semgraph
 import utils.model_utils.sdp_simple_scorer as sdp_scorer
 from utils.best_result import BestResult
 from utils.seed import set_seed
+from utils.model_utils.label_smoothing import label_smoothed_kl_div_loss
+
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -69,11 +71,14 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
 
             loss = 2 * ((1 - label_loss_ratio) * head_loss + label_loss_ratio * rel_loss)
 
-            if self.args.n_gpu > 1:
-                loss = loss.mean()  # mean() to average on multi-gpu parallel training
-
             if self.args.average_loss_by_words_num:
                 loss = loss / words_num
+
+            if self.args.scale_loss:
+                loss = loss * self.args.loss_scaling_ratio
+
+            if self.args.n_gpu > 1:
+                loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
             if update:
                 loss.backward()
@@ -208,7 +213,7 @@ class BERTBiaffineTrainer(BiaffineDependencyTrainer):
         inputs = {
             'input_ids': batch[0],
             'attention_mask': batch[1],
-            'token_type_ids': batch[2] if args.encoder_type in ['bert', 'xlnet'] else None,
+            'token_type_ids': batch[2] if args.encoder_type in ['bertology', 'xlnet'] else None,
             'start_pos': batch[3],
             'end_pos': batch[4],
         }
@@ -222,8 +227,6 @@ class BERTBiaffineTrainer(BiaffineDependencyTrainer):
 class TransformerBiaffineTrainer(BiaffineDependencyTrainer):
     def _unpack_batch(self, args, batch):
         pass
-
-    pass
 
 
 class CharRNNBiaffineTrainer(BiaffineDependencyTrainer):

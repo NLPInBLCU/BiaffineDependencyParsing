@@ -9,21 +9,25 @@
 - [x] BERT后添加一个self-attention层
 - [x] 加入Layer Attention、Layer Dropout
 - [x] 重构get optimizer
+- [x] dev数据集上调优
+- [x] 按照单词数量均分loss
+- [x] 调整BERT 优化器的参数
+- [x] 保存、加载
 ## High Priority
-- [ ] dev数据集上调优
-- [ ] 保存、加载
-- [ ] 保存加载预处理的dataset
-- [ ] 调整BERT 优化器的参数
-- [ ] decoder部分的参数初始化
-- [ ] 按照句长均分loss
-- [ ] 按照累计句长划分batch
+- [ ] 调整学习率、最大步数、warmup prop
 - [ ] Input Masking
-- [ ] 多任务训练 text/news分成两个decoder一起训练（此时训练集也得分开）
 - [ ] 多领域数据的采样（参考多语BERT）
 - [ ] 多任务训练 + POS 标注
 - [ ] 解决Biaffine分类（二分类、多分类）的类别不平衡问题
+- [ ] 加入Label Smoothing,缺少ignore_index的实现
 - [ ] 重构预测得到probs的后处理部分
 - [ ] 支持roberta
+- [ ] 模型参数不同学习率
+## Middle Priority
+- [ ] 保存加载预处理的dataset
+- [ ] decoder部分的参数初始化
+- [ ] 按照累计句长划分batch
+- [ ] 多任务训练 text/news分成两个decoder一起训练（此时训练集也得分开）
 ## Low Priority
 - [ ] 修改GraphVocab，支持过滤低频次的标签
 - [ ] 支持xlnet

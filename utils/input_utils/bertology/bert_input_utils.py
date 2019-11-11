@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Created by li huayong on 2019/9/24
 import os
+import pathlib
+
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from utils.input_utils.conll_file import load_conllu_file
@@ -8,7 +10,7 @@ from utils.input_utils.graph_vocab import GraphVocab
 from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
 
 BERT_TOKENIZER = {
-    'bert': BertTokenizer,
+    'bertology': BertTokenizer,
     'xlnet': XLNetTokenizer,
     'xlm': XLMTokenizer,
     'roberta': RobertaTokenizer,
@@ -49,7 +51,7 @@ class CoNLLUProcessor(object):
         assert isinstance(graph_vocab, GraphVocab)
         self.graph_vocab = graph_vocab
         self.args = args
-        assert args.encoder_type == 'bert', "暂时不支持xlent等类似BERT的模型，输入端需要适配（ROOT,start_pos,end_pos等等）"
+        assert args.encoder_type == 'bertology', "暂时不支持xlent等类似BERT的模型，输入端需要适配（ROOT,start_pos,end_pos等等）"
         # TODO：支持xlnet,roberta,xlm等模型
         self.word_vocab = word_vocab
 
@@ -301,7 +303,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
 
 
 def load_and_cache_examples(args, graph_vocab, tokenizer, train=True, dev=True, test=False):
-    word_vocab = tokenizer.vocab if args.encoder_type == 'bert' else None
+    word_vocab = tokenizer.vocab if args.encoder_type == 'bertology' else None
     processor = CoNLLUProcessor(args, graph_vocab, word_vocab)
     # Load data features from cache or dataset file
     # cached_features_file = os.path.join(args.data_dir, 'cached_{}_{}_{}'.format(
@@ -420,7 +422,8 @@ def load_bert_tokenizer(model_path, model_type, do_lower_case=True):
 
 
 def load_input(args, train=True, dev=True, test=False):
-    tokenizer = load_bert_tokenizer(args.bert_path, args.encoder_type)
+    assert (pathlib.Path(args.saved_model_path) / 'vocab.txt').exists()
+    tokenizer = load_bert_tokenizer(args.saved_model_path, args.bertology_type)
     vocab = GraphVocab(args.graph_vocab_file)
     train_dataset, train_conllu, dev_dataset, dev_conllu, test_dataset, test_conllu = \
         load_and_cache_examples(args, vocab, tokenizer, train=train, dev=dev, test=test)
@@ -442,11 +445,11 @@ def load_input(args, train=True, dev=True, test=False):
 if __name__ == '__main__':
     class Args():
         def __init__(self):
-            self.model_path = '/home/liangs/disk/data/bert-base-chinese'
+            self.model_path = '/home/liangs/disk/data/bertology-base-chinese'
             self.data_dir = '/home/liangs/codes/doing_codes/CSDP_Biaffine_Parser_lhy/CSDP_Biaffine_Parser_lhy/dataset'
             self.train_file = 'test.conllu'
             self.max_seq_len = 10
-            self.encoder_type = 'bert'
+            self.encoder_type = 'bertology'
             self.root_representation = 'unused'
             self.device = 'cpu'
             self.skip_too_long_input = False
@@ -454,7 +457,7 @@ if __name__ == '__main__':
 
     args = Args()
     # print(f'{}')
-    tokenizer = load_bert_tokenizer('/home/liangs/disk/data/bert-base-chinese', 'bert')
+    tokenizer = load_bert_tokenizer('/home/liangs/disk/data/bertology-base-chinese', 'bertology')
     # print(tokenizer)
     # print(tokenizer.vocab['[unused1]'])
     vocab = GraphVocab('/home/liangs/codes/doing_codes/CSDP_Biaffine_Parser/dataset/graph_vocab.txt')
