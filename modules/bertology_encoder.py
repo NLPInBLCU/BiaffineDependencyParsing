@@ -20,7 +20,7 @@ from modules.layer_attention import LayerAttention
 from modules.transformer_layer import TransformerSentenceEncoderLayer
 
 BERTology_MODEL_CLASSES = {
-    'bertology': (BertConfig, BertModel, BertTokenizer),
+    'bert': (BertConfig, BertModel, BertTokenizer),
     # 'xlnet': (XLNetConfig, XLNetForSequenceClassification, XLNetTokenizer),
     # 'xlm': (XLMConfig, XLMForSequenceClassification, XLMTokenizer),
     # 'roberta': (RobertaConfig, RobertaForSequenceClassification, RobertaTokenizer),

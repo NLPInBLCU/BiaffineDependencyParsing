@@ -7,8 +7,6 @@ run:
   cuda: true
   cpu: false
   seed: 1234
-  #执行模型：train,dev,inference
-  run_mode: 'train'
   #只需要指定最大的epoch数量，不需要指定最大steps
   #可能的选择：80,150
   max_train_epochs: 80
@@ -19,7 +17,6 @@ data_set:
   data_dir: 'dataset'
   train_file: 'train/text_news.train.conllu'
   dev_file: 'dev/sdp_text_dev.conllu'
-  test_file: 'test/sdp_text_test.conllu'
   # GPU 32GB:80; 24GB:64; 12GB:32; 10GB:20
   per_gpu_train_batch_size: 20
   # GPU <=12GB:10; >12GB:20或者30
@@ -42,7 +39,7 @@ CharRNN:
 Transformer: 
 BERT: 
   #最大长度 必须超过数据集的最大长度（字数）,新闻领域的最大句长可达233
-  bertology_type: 'bertology'
+  bertology_type: 'bert'
   max_seq_len: 100
   #ROOT的表示形式：unused,cls,root ....
   root_representation: 'unused'
@@ -63,6 +60,7 @@ update:
   scale_loss: false
   loss_scaling_ratio: 2
   label_smoothing: 0.03
+  # =0则不使用梯度裁剪
   max_grad_norm: 5.0
   # adam-bertology (huggingface版本的adamw); adamw-torch (torch 1.2); adam;
   optimizer: 'adamw-bertology'

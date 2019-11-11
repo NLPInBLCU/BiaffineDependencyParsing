@@ -9,8 +9,8 @@ from utils.input_utils.conll_file import load_conllu_file
 from utils.input_utils.graph_vocab import GraphVocab
 from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
 
-BERT_TOKENIZER = {
-    'bertology': BertTokenizer,
+BERTology_TOKENIZER = {
+    'bert': BertTokenizer,
     'xlnet': XLNetTokenizer,
     'xlm': XLMTokenizer,
     'roberta': RobertaTokenizer,
@@ -60,9 +60,9 @@ class CoNLLUProcessor(object):
     #     CoNLLU_file, CoNLLU_data = load_conllu_file(os.path.join(data_dir, file_name))
     #     return self._create_bert_example(CoNLLU_data, 'train', max_seq_length), CoNLLU_file
 
-    def get_examples(self, data_dir, file_name, max_seq_length):
+    def get_examples(self, file_path, max_seq_length):
         """Gets a collection of `InputExample`s for the dev set."""
-        CoNLLU_file, CoNLLU_data = load_conllu_file(os.path.join(data_dir, file_name))
+        CoNLLU_file, CoNLLU_data = load_conllu_file(file_path)
         return self._create_bert_example(CoNLLU_data, 'dev', max_seq_length), CoNLLU_file
 
     def _get_words_start_end_pos(self, words_list, max_seq_length):
@@ -302,99 +302,34 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
     return features
 
 
-def load_and_cache_examples(args, graph_vocab, tokenizer, train=True, dev=True, test=False):
+def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer):
     word_vocab = tokenizer.vocab if args.encoder_type == 'bertology' else None
     processor = CoNLLUProcessor(args, graph_vocab, word_vocab)
-    # Load data features from cache or dataset file
-    # cached_features_file = os.path.join(args.data_dir, 'cached_{}_{}_{}'.format(
-    #     'dev' if evaluate else 'train',
-    #     list(filter(None, args.model_path.split('/'))).pop(),
-    #     str(args.max_seq_length)))
-    # if os.path.exists(cached_features_file):
-    #     # logger.info("Loading features from cached file %s", cached_features_file)
-    #     features = torch.load(cached_features_file)
-    # else:
-    # logger.info("Creating features from dataset file at %s", args.data_dir)
 
     label_list = graph_vocab.get_labels()
-    if test:
-        test_examples, test_CoNLLU_file = processor.get_examples(args.data_dir, args.test_file, args.max_seq_len)
-        test_features = convert_examples_to_features(test_examples, label_list, args.max_seq_len, tokenizer,
-                                                     cls_token_at_end=bool(args.encoder_type in ['xlnet']),
-                                                     # xlnet has a cls token at the end
-                                                     cls_token=tokenizer.cls_token,
-                                                     cls_token_segment_id=2 if args.encoder_type in ['xlnet'] else 0,
-                                                     sep_token=tokenizer.sep_token,
-                                                     sep_token_extra=bool(args.encoder_type in ['roberta']),
-                                                     # roberta uses an extra separator b/w pairs of sentences,
-                                                     # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-                                                     pad_on_left=bool(args.encoder_type in ['xlnet']),
-                                                     # pad on the left for xlnet
-                                                     pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[
-                                                         0],
-                                                     pad_token_segment_id=4 if args.encoder_type in ['xlnet'] else 0,
-                                                     skip_too_long_input=args.skip_too_long_input,
-                                                     )
-        # print("Saving features into cached file %s", cached_features_file)
-        # torch.save(features, cached_features_file)
+    examples, CoNLLU_file = processor.get_examples(conllu_file_path, args.max_seq_len)
+    features = convert_examples_to_features(examples, label_list, args.max_seq_len, tokenizer,
+                                            cls_token_at_end=bool(args.encoder_type in ['xlnet']),
+                                            # xlnet has a cls token at the end
+                                            cls_token=tokenizer.cls_token,
+                                            cls_token_segment_id=2 if args.encoder_type in ['xlnet'] else 0,
+                                            sep_token=tokenizer.sep_token,
+                                            sep_token_extra=bool(args.encoder_type in ['roberta']),
+                                            # roberta uses an extra separator b/w pairs of sentences,
+                                            # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
+                                            pad_on_left=bool(args.encoder_type in ['xlnet']),
+                                            # pad on the left for xlnet
+                                            pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
+                                            pad_token_segment_id=4 if args.encoder_type in ['xlnet'] else 0,
+                                            skip_too_long_input=args.skip_too_long_input,
+                                            )
+    # Convert to Tensors and build dataset
+    data_set = feature_to_dataset(features)
 
-        # Convert to Tensors and build dataset
-        test_dataset = make_dataset(args, test_features)
-    else:
-        test_dataset = test_CoNLLU_file = None
-    if dev:
-        dev_examples, dev_CoNLLU_file = processor.get_examples(args.data_dir, args.dev_file, args.max_seq_len)
-        dev_features = convert_examples_to_features(dev_examples, label_list, args.max_seq_len, tokenizer,
-                                                    cls_token_at_end=bool(args.encoder_type in ['xlnet']),
-                                                    # xlnet has a cls token at the end
-                                                    cls_token=tokenizer.cls_token,
-                                                    cls_token_segment_id=2 if args.encoder_type in ['xlnet'] else 0,
-                                                    sep_token=tokenizer.sep_token,
-                                                    sep_token_extra=bool(args.encoder_type in ['roberta']),
-                                                    # roberta uses an extra separator b/w pairs of sentences,
-                                                    # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-                                                    pad_on_left=bool(args.encoder_type in ['xlnet']),
-                                                    # pad on the left for xlnet
-                                                    pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
-                                                    pad_token_segment_id=4 if args.encoder_type in ['xlnet'] else 0,
-                                                    skip_too_long_input=args.skip_too_long_input,
-                                                    )
-        # print("Saving features into cached file %s", cached_features_file)
-        # torch.save(features, cached_features_file)
-
-        ## Convert to Tensors and build dataset
-        dev_dataset = make_dataset(args, dev_features)
-    else:
-        dev_dataset = dev_CoNLLU_file = None
-    if train:
-        train_examples, train_CoNLLU_file = processor.get_examples(args.data_dir, args.train_file, args.max_seq_len)
-        train_features = convert_examples_to_features(train_examples, label_list, args.max_seq_len, tokenizer,
-                                                      cls_token_at_end=bool(args.encoder_type in ['xlnet']),
-                                                      # xlnet has a cls token at the end
-                                                      cls_token=tokenizer.cls_token,
-                                                      cls_token_segment_id=2 if args.encoder_type in ['xlnet'] else 0,
-                                                      sep_token=tokenizer.sep_token,
-                                                      sep_token_extra=bool(args.encoder_type in ['roberta']),
-                                                      # roberta uses an extra separator b/w pairs of sentences,
-                                                      # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-                                                      pad_on_left=bool(args.encoder_type in ['xlnet']),
-                                                      # pad on the left for xlnet
-                                                      pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[
-                                                          0],
-                                                      pad_token_segment_id=4 if args.encoder_type in ['xlnet'] else 0,
-                                                      skip_too_long_input=args.skip_too_long_input,
-                                                      )
-        # print("Saving features into cached file %s", cached_features_file)
-        # torch.save(features, cached_features_file)
-
-        ## Convert to Tensors and build dataset
-        train_dataset = make_dataset(args, train_features)
-    else:
-        train_dataset = train_CoNLLU_file = None
-    return train_dataset, train_CoNLLU_file, dev_dataset, dev_CoNLLU_file, test_dataset, test_CoNLLU_file
+    return data_set, CoNLLU_file
 
 
-def make_dataset(args, features):
+def feature_to_dataset(features):
     all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
@@ -417,29 +352,29 @@ def get_data_loader(dataset, batch_size, evaluation=False):
 
 def load_bert_tokenizer(model_path, model_type, do_lower_case=True):
     # 必须把 unused 添加到 additional_special_tokens 上，否则 unused （用来表示ROOT）可能无法正确切分！
-    return BERT_TOKENIZER[model_type].from_pretrained(model_path, do_lower_case=do_lower_case,
-                                                      additional_special_tokens=['[unused1]', '[unused2]', '[unused3]'])
+    return BERTology_TOKENIZER[model_type].from_pretrained(model_path, do_lower_case=do_lower_case,
+                                                           additional_special_tokens=['[unused1]', '[unused2]',
+                                                                                      '[unused3]'])
 
 
-def load_input(args, train=True, dev=True, test=False):
+def load_bertology_input(args):
     assert (pathlib.Path(args.saved_model_path) / 'vocab.txt').exists()
     tokenizer = load_bert_tokenizer(args.saved_model_path, args.bertology_type)
     vocab = GraphVocab(args.graph_vocab_file)
-    train_dataset, train_conllu, dev_dataset, dev_conllu, test_dataset, test_conllu = \
-        load_and_cache_examples(args, vocab, tokenizer, train=train, dev=dev, test=test)
-    if train_dataset:
+    if args.run_mode == 'train':
+        tokenizer.save_pretrained(args.output_model_dir)
+    if args.run_mode in ['dev', 'inference']:
+        dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_file, vocab, tokenizer)
+        data_loader = get_data_loader(dataset, batch_size=args.eval_batch_size, evaluation=True)
+        return data_loader, conllu_file
+    elif args.run_mode == 'train':
+        train_dataset, train_conllu_file = load_and_cache_examples(args, os.path.join(args.data_dir, args.train_file),
+                                                                   vocab, tokenizer)
+        dev_dataset, dev_conllu_file = load_and_cache_examples(args, os.path.join(args.data_dir, args.dev_file),
+                                                               vocab, tokenizer)
         train_data_loader = get_data_loader(train_dataset, batch_size=args.train_batch_size, evaluation=False)
-    else:
-        train_data_loader = None
-    if dev_dataset:
-        dev_data_loader = get_data_loader(dev_dataset, batch_size=args.eval_batch_size, evaluation=True)
-    else:
-        dev_data_loader = None
-    if test_dataset:
-        test_data_loader = get_data_loader(test_dataset, batch_size=args.eval_batch_size, evaluation=True)
-    else:
-        test_data_loader = None
-    return train_data_loader, train_conllu, dev_data_loader, dev_conllu, test_data_loader, test_conllu
+        dev_data_loader = get_data_loader(dev_dataset, batch_size=args.dev_batch_size, evaluation=True)
+        return train_data_loader, train_conllu_file, dev_data_loader, dev_conllu_file
 
 
 if __name__ == '__main__':

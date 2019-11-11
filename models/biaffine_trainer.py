@@ -16,7 +16,6 @@ from utils.best_result import BestResult
 from utils.seed import set_seed
 from utils.model_utils.label_smoothing import label_smoothed_kl_div_loss
 
-
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
@@ -60,16 +59,16 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         if calc_loss:
             assert label_loss_ratio
             assert unlabeled_target is not None and labeled_target is not None
-            crit_head = nn.BCEWithLogitsLoss(weight=weights, reduction='sum')
-            head_loss = crit_head(unlabeled_scores, unlabeled_target)
+            dep_arc_loss_func = nn.BCEWithLogitsLoss(weight=weights, reduction='sum')
+            dep_arc_loss = dep_arc_loss_func(unlabeled_scores, unlabeled_target)
 
-            crit_rel = nn.CrossEntropyLoss(ignore_index=-1, reduction='sum')
+            dep_label_loss_func = nn.CrossEntropyLoss(ignore_index=-1, reduction='sum')
             dependency_mask = labeled_target.eq(0)
             labeled_target = labeled_target.masked_fill(dependency_mask, -1)
             labeled_scores = labeled_scores.contiguous().view(-1, len(self.graph_vocab.get_labels()))
-            rel_loss = crit_rel(labeled_scores, labeled_target.view(-1))
+            dep_label_loss = dep_label_loss_func(labeled_scores, labeled_target.view(-1))
 
-            loss = 2 * ((1 - label_loss_ratio) * head_loss + label_loss_ratio * rel_loss)
+            loss = 2 * ((1 - label_loss_ratio) * dep_arc_loss + label_loss_ratio * dep_label_loss)
 
             if self.args.average_loss_by_words_num:
                 loss = loss / words_num
@@ -82,7 +81,8 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
 
             if update:
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
+                if self.args.max_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
                 if self.optim_scheduler:
                     self.optim_scheduler.step()  # Update learning rate schedule
                 self.optimizer.step()
@@ -144,6 +144,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                         if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
                             print(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             print(best_result)
+                            self.model.save_pretrained(self.args.output_model_dir)
 
                 if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
                     print(f'\n## Early stop in step:{global_step} ##')
@@ -159,11 +160,14 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         print(best_result)
         summary_writer.close()
 
-    def dev(self, dev_data_loader, dev_CoNLLU_file):
+    def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):
         assert isinstance(dev_CoNLLU_file, CoNLLFile)
+        if input_conllu_path is None:
+            input_conllu_path = os.path.join(self.args.data_dir, self.args.dev_file)
+        if output_conllu_path is None:
+            output_conllu_path = self.args.dev_output_path
         dev_data_loader = tqdm(dev_data_loader, desc='Evaluation')
         predictions = []
-        # batch_sent_lens = []
         for step, batch in enumerate(dev_data_loader):
             self.model.eval()
             batch = tuple(t.to(self.args.device) for t in batch)
@@ -185,11 +189,11 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
             # batch_sent_lens += sent_lens
 
         dev_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
-        dev_CoNLLU_file.write_conll(self.args.dev_output_path)
-        UAS, LAS = sdp_scorer.score(self.args.dev_output_path, os.path.join(self.args.data_dir, self.args.dev_file))
+        dev_CoNLLU_file.write_conll(output_conllu_path)
+        UAS, LAS = sdp_scorer.score(output_conllu_path, input_conllu_path)
         return UAS, LAS
 
-    def inference(self, inference_data_loader, inference_CoNLLU_file):
+    def inference(self, inference_data_loader, inference_CoNLLU_file, output_conllu_path):
         inference_data_loader = tqdm(inference_data_loader, desc='Inference')
         predictions = []
         for step, batch in enumerate(inference_data_loader):
@@ -204,7 +208,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                                                                calc_loss=False, update=False, calc_prediction=True)
             predictions += batch_prediction
         inference_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
-        inference_CoNLLU_file.write_conll(self.args.test_output_path)
+        inference_CoNLLU_file.write_conll(output_conllu_path)
         return predictions
 
 
