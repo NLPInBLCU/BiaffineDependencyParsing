@@ -10,3 +10,24 @@ Various Encoder Layers (~~vanilla LSTM/Highway Droput LSTM/Transformer/~~BERTolo
 - https://github.com/WangYuxuan93/CLBT
 - https://github.com/stanfordnlp/stanfordnlp
 
+## 使用
+### 训练Train
+```shell
+python main.py -c config_files/bert_biaffine.yaml
+```
+### 验证Dev
+```shell
+python main.py -c config_files/bert_biaffine.yaml \
+               --run dev --model_path <训练好的模型路径> \
+               --input <测试输入conllu文件路径> \
+               --output <测试输出conllu文件路径> \
+               --use_cuda
+```
+### 推理Inference
+```shell
+python main.py -c config_files/bert_biaffine.yaml \
+               --run inference --model_path <训练好的模型路径> \
+               --input <输入conllu文件路径> \
+               --output <输出conllu文件路径> \
+               --use_cuda
+```
