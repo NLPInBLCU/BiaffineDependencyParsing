@@ -160,7 +160,12 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                         if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
                             print(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             print(best_result)
-                            self.model.save_pretrained(self.args.output_model_dir)
+                            # 保存最优模型：
+                            if hasattr(self.model, 'module'):
+                                # 多卡,torch.nn.DataParallel封装model
+                                self.model.module.save_pretrained(self.args.output_model_dir)
+                            else:
+                                self.model.save_pretrained(self.args.output_model_dir)
 
                 if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
                     print(f'\n## Early stop in step:{global_step} ##')
