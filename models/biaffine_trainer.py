@@ -26,7 +26,7 @@ except ImportError:
 class BiaffineDependencyTrainer(metaclass=ABCMeta):
     def __init__(self, args, model):
         self.model = model
-        self.optimizer, self.optim_scheduler = get_optimizer(args, model)
+        self.optimizer = self.optim_scheduler = None
         self.graph_vocab = GraphVocab(args.graph_vocab_file)
         self.args = args
 
@@ -119,6 +119,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         return loss, batch_prediction
 
     def train(self, train_data_loader, dev_data_loader=None, dev_CoNLLU_file=None):
+        self.optimizer, self.optim_scheduler = get_optimizer(self.args, self.model)
         global_step = 0
         best_result = BestResult()
         self.model.zero_grad()

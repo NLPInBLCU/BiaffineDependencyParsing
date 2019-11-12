@@ -391,7 +391,7 @@ def load_bertology_input(args):
     if args.run_mode == 'train':
         tokenizer.save_pretrained(args.output_model_dir)
     if args.run_mode in ['dev', 'inference']:
-        dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_file, vocab, tokenizer, training=False)
+        dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_path, vocab, tokenizer, training=False)
         data_loader = get_data_loader(dataset, batch_size=args.eval_batch_size, evaluation=True)
         return data_loader, conllu_file
     elif args.run_mode == 'train':

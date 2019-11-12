@@ -38,7 +38,7 @@ def load_trainer(args):
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
         model = torch.nn.DataParallel(model)
-        print(f'Parallel Train, GPU num : {args.n_gpu}')
+        print(f'Parallel Running, GPU num : {args.n_gpu}')
         args.parallel_train = True
     else:
         args.parallel_train = False
@@ -124,7 +124,7 @@ def dev(args):
         dev_UAS, dev_LAS = trainer.dev(dev_data_loader, dev_conllu,
                                        input_conllu_path=args.input_conllu_path,
                                        output_conllu_path=args.output_conllu_path)
-    print(f'DEV output file saved in {args.output_conllu_file}')
+    print(f'DEV output file saved in {args.output_conllu_path}')
     print(f'DEV metrics:\nUAS:{dev_UAS}\nLAS:{dev_LAS}')
 
 

@@ -27,8 +27,8 @@ def parse_args():
     parser.add_argument('--use_cuda', action='store_true', default=False, help='仅仅影响dev或者inference模式。train模式下用yaml控制')
     args = parser.parse_args()
     if args.run in ['dev', 'inference']:
-        assert args.model and args.input and args.output
-        assert pathlib.Path(args.model).is_dir()
+        assert args.model_path and args.input and args.output
+        assert pathlib.Path(args.model_path).is_dir()
         assert pathlib.Path(args.input).is_file()
     yaml_config = yaml.load(open(args.config_file, encoding='utf-8'))
     args_dict = {}

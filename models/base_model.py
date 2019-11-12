@@ -24,7 +24,7 @@ class BaseModel(nn.Module):
         # Save configuration file
         # 如果用了BERTology的话，需要保存他们的参数到json文件中
         if model_to_save.args.encoder_type == 'bertology':
-            model_to_save.encoder.bertology.bertology_config.save_pretrained(save_directory)
+            model_to_save.encoder.bertology_config.save_pretrained(save_directory)
 
         # If we save using the predefined names, we can load using `from_pretrained`
         output_model_file = os.path.join(save_directory, weight_file_name)
