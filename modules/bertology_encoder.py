@@ -20,7 +20,7 @@ from modules.layer_attention import LayerAttention
 from modules.transformer_layer import TransformerSentenceEncoderLayer
 
 BERTology_MODEL_CLASSES = {
-    'bertology': (BertConfig, BertModel, BertTokenizer),
+    'bert': (BertConfig, BertModel, BertTokenizer),
     # 'xlnet': (XLNetConfig, XLNetForSequenceClassification, XLNetTokenizer),
     # 'xlm': (XLMConfig, XLMForSequenceClassification, XLMTokenizer),
     # 'roberta': (RobertaConfig, RobertaForSequenceClassification, RobertaTokenizer),
@@ -44,7 +44,7 @@ class BERTologyEncoder(nn.Module):
     def __init__(
             self,
             no_cuda=False,
-            bertology='bertology',
+            bertology='bert',
             bertology_path='.',
             bertology_output_mode='last_four_sum',
             bertology_word_select_mode='s',
@@ -96,6 +96,7 @@ class BERTologyEncoder(nn.Module):
         bert_outputs = self.bertology(input_ids, position_ids=position_ids,
                                       token_type_ids=token_type_ids,
                                       attention_mask=attention_mask, head_mask=head_mask)
+        # bert_outputs: 0: sequence_output, 1: pooled_output, 2:tuple (hidden_states), 3:tuple (attentions)
         last_layer_hidden_state = bert_outputs[0]
         # hidden_states:one for the output of each layer + the output of the embeddings
         all_layers_hidden_states = bert_outputs[2][1:]
