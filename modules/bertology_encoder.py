@@ -44,7 +44,7 @@ class BERTologyEncoder(nn.Module):
     def __init__(
             self,
             no_cuda=False,
-            bertology='bertology',
+            bertology='bert',
             bertology_path='.',
             bertology_output_mode='last_four_sum',
             bertology_word_select_mode='s',

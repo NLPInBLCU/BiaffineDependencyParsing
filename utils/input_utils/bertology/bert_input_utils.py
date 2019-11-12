@@ -400,7 +400,7 @@ def load_bertology_input(args):
         dev_dataset, dev_conllu_file = load_and_cache_examples(args, os.path.join(args.data_dir, args.dev_file),
                                                                vocab, tokenizer, training=False)
         train_data_loader = get_data_loader(train_dataset, batch_size=args.train_batch_size, evaluation=False)
-        dev_data_loader = get_data_loader(dev_dataset, batch_size=args.dev_batch_size, evaluation=True)
+        dev_data_loader = get_data_loader(dev_dataset, batch_size=args.eval_batch_size, evaluation=True)
         return train_data_loader, train_conllu_file, dev_data_loader, dev_conllu_file
 
 

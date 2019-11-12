@@ -18,7 +18,10 @@ class BiaffineDependencyModel(BaseModel):
         super().__init__()
         self.graph_vocab = GraphVocab(args.graph_vocab_file)
         if args.encoder_type == 'bertology':
+            # args.encoder_type 控制用什么类型的encoder（EBRTology/Transformer等等）
+            # args.bertology_type 控制具体是什么类型的BERT（bert/xlnert/roberta等等）
             self.encoder = BERTologyEncoder(no_cuda=not args.cuda,
+                                            bertology=args.bertology_type,
                                             bertology_path=args.saved_model_path,
                                             bertology_word_select_mode=args.bertology_word_select,
                                             bertology_output_mode=args.bertology_output_mode,

@@ -84,7 +84,7 @@ def make_output_dir(args):
         init_logger(args.log_name, str(output_dir / 'parser.log'))
 
 
-def train(args, trainer):
+def train(args):
     assert args.run_mode == 'train'
     # 创建输出文件夹，保存运行结果，配置文件，模型参数
     make_output_dir(args)
@@ -107,14 +107,19 @@ def train(args, trainer):
         print(f'early stop steps: {args.early_stop_steps}\n')
     else:
         print(f'do not use early stop, training will last {args.max_train_epochs} epochs')
+    with Timer('load trainer'):
+        trainer = load_trainer(args)
     with Timer('Train'):
         trainer.train(train_data_loader, dev_data_loader, dev_conllu)
     print('train DONE')
 
 
-def dev(args, trainer):
+def dev(args):
+    # args = trainer.args
     assert args.run_mode == 'dev'
     dev_data_loader, dev_conllu = load_bertology_input(args)
+    with Timer('load trainer'):
+        trainer = load_trainer(args)
     with Timer('dev'):
         dev_UAS, dev_LAS = trainer.dev(dev_data_loader, dev_conllu,
                                        input_conllu_path=args.input_conllu_path,
@@ -123,9 +128,12 @@ def dev(args, trainer):
     print(f'DEV metrics:\nUAS:{dev_UAS}\nLAS:{dev_LAS}')
 
 
-def inference(args, trainer):
+def inference(args):
+    # args = trainer.args
     assert args.run_mode == 'inference'
     inference_data_loader, inference_conllu = load_bertology_input(args)
+    with Timer('load trainer'):
+        trainer = load_trainer(args)
     with Timer('inference'):
         trainer.inference(inference_data_loader, inference_conllu, output_conllu_path=args.output_conllu_path)
     print(f'INFERENCE output file saved in {args.output_conllu_path}')
@@ -139,15 +147,13 @@ def main():
     config_for_multi_gpu(args)
     # set_seed 必须在设置n_gpu之后
     set_seed(args)
-    with Timer('load trainer'):
-        trainer = load_trainer(args)
 
     if args.run_mode == 'train':
-        train(args, trainer)
+        train(args)
     elif args.run_mode == 'dev':
-        dev(args, trainer)
+        dev(args)
     elif args.run_mode == 'inference':
-        inference(args, trainer)
+        inference(args)
 
 
 if __name__ == '__main__':

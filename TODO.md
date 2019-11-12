@@ -18,7 +18,7 @@
 ## High Priority
 - [ ] 调整学习率、最大步数、warmup prop
 - [ ] 多领域数据的采样（参考多语BERT-指数平滑加权）
-- [ ] 多任务训练 + POS 标注
+- [ ] **多任务训练 + POS 标注**
 - [ ] 解决Biaffine分类（二分类、多分类）的类别不平衡问题
 - [ ] **加入Label Smoothing,缺少ignore_index的实现**
 - [ ] 重构预测得到probs的后处理部分
