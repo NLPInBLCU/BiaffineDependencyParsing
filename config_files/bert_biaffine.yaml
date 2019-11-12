@@ -76,7 +76,10 @@ update:
   beta2: 0.99
   eps: 1.0e-12
   weight_decay: 3.0e-9
-  learning_rate: 5.0e-5
+  learning_rate: 5.0e-5  # 学习率
+  different_lr: false  # 如果为True，则使用下面的两个学习率
+  bertology_lr: 5.0e-5
+  other_lr: 1.0e-3
   # bertDistill:1.0e-6;
   adam_epsilon: 1.0e-8
   # bertDistill:0.05;

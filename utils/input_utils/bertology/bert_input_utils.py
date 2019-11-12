@@ -325,7 +325,9 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
                           start_pos=start_pos,
                           end_pos=end_pos))
     if skip_input_num > 0:
-        print(f'\n>> convert_examples_to_features skip input:{skip_input_num} !!')
+        print(f'\n>> convert_examples_to_features skip input:{skip_input_num} !!\n')
+    else:
+        print('\n>> No sentences are skipped :)\n')
     return features
 
 
