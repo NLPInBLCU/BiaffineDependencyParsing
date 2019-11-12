@@ -16,7 +16,7 @@
 - [x] 模型部分参数冻结
 - [x] Input Masking
 ## High Priority
-- [ ] 调整学习率、最大步数、warmup prop
+- [ ] **调整学习率、最大步数、warmup prop**
 - [ ] 多领域数据的采样（参考多语BERT-指数平滑加权）
 - [ ] **多任务训练 + POS 标注**
 - [ ] 解决Biaffine分类（二分类、多分类）的类别不平衡问题
