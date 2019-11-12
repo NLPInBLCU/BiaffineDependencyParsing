@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Created by li huayong on 2019/9/28
 import os
+import re
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -38,6 +39,18 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         :return:返回一个元祖，[1]是inputs，类型为字典；[2]是word mask；[3]是sentence length,python 列表；[4]是dep ids
         """
         raise NotImplementedError('must implement in sub class')
+
+    def _custom_train_operations(self, epoch):
+        """
+            某些模型在训练时可能需要一些定制化的操作，
+            比如BERT类型的模型可能会在Training的时候动态freeze某些层
+            为了支持这些操作同时不破坏BiaffineDependencyTrainer的普适性，我们加入这个方法
+            BiaffineDependencyTrainer的子类可以选择重写该方法以支持定制化操作
+            注意这个方法会在训练的每个epoch的开始调用一次
+            本方法默认不会做任何事情
+        :return:
+        """
+        pass
 
     def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_pad_mask,
                             label_loss_ratio=None, sentence_lengths=None,
@@ -115,6 +128,9 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
             train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}')
+            # 某些模型在训练时可能需要一些定制化的操作，默认什么都不做
+            # 具体参考子类中_custom_train_operations的实现
+            self._custom_train_operations(epoch)
             for step, batch in enumerate(train_data_loader):
                 batch = tuple(t.to(self.args.device) for t in batch)
                 self.model.train()
@@ -212,7 +228,19 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         return predictions
 
 
-class BERTBiaffineTrainer(BiaffineDependencyTrainer):
+class BERTologyBiaffineTrainer(BiaffineDependencyTrainer):
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+        if config.freeze:
+            assert config.freeze_bertology_layers >= -1 and config.freeze_epochs in ['all', 'first']
+        self._freeze = config.freeze
+        self._freeze_layers = config.freeze_bertology_layers
+        self._freeze_epochs = config.freeze_epochs
+        # 记录被freeze的参数名称
+        # 在第一个epoch时刻写入
+        # 之后直接读取这个list中的参数
+        self._freeze_parameter_names = []
+
     def _unpack_batch(self, args, batch):
         inputs = {
             'input_ids': batch[0],
@@ -226,6 +254,41 @@ class BERTBiaffineTrainer(BiaffineDependencyTrainer):
         word_mask = (batch[3] != (args.max_seq_len - 1)).to(torch.long).to(args.device)
         sent_len = torch.sum(word_mask, 1).cpu().tolist()
         return inputs, word_mask, sent_len, dep_ids
+
+    def _custom_train_operations(self, epoch):
+        """
+            重写BiaffineDependencyTrainer的_custom_train_operations方法，
+            提供定制化的训练操作
+            这里我们做BERTology中某些层的freeze
+        :param epoch:
+        :return:
+        """
+        if self._freeze:
+            if epoch == 1:
+                # 首个epoch一定会freeze
+                # 利用正则识别参数名，对其进行freeze
+                for name, para in self.model.named_parameters():
+                    # Freeze BERTology embedding layer
+                    if re.match(f'^.+encoder\.bertology\.embeddings\..+', name):
+                        para.requires_grad = False
+                        self._freeze_parameter_names.append(name)
+                    # Freeze other BERTology Layers
+                    # 如果self._freeze_layers > -1；则说明除了freeze embedding层之外，还要freeze别的层
+                    if self._freeze_layers > -1:
+                        if re.match(
+                                f'^.+encoder\.bertology\.encoder\.layer\.[0-{self._freeze_layers}]\..+',
+                                name):
+                            para.requires_grad = False
+                        self._freeze_parameter_names.append(name)
+            else:
+                # 如果_freeze_epochs == ‘all’,则此时不需要做任何事情，因为第一个epoch已经freeze过了
+                if self._freeze_epochs == 'first':
+                    # 仅在第一个epoch freeze参数
+                    # epoch大于1的时候不再需要freeze了
+                    # 此时将_freeze_parameter_names中的参数重新设置为需要计算梯度
+                    for name, para in self.model.named_parameters():
+                        if name in self._freeze_parameter_names:
+                            para.requires_grad = True
 
 
 class TransformerBiaffineTrainer(BiaffineDependencyTrainer):

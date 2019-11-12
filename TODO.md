@@ -23,6 +23,7 @@
 - [ ] 重构预测得到probs的后处理部分
 - [ ] 支持roberta
 - [ ] 模型参数不同学习率
+- [ ] 模型部分参数冻结 
 ## Middle Priority
 - [ ] 保存加载预处理的dataset
 - [ ] decoder部分的参数初始化

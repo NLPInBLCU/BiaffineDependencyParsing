@@ -18,7 +18,7 @@ import pathlib
 import shutil
 from datetime import datetime
 from utils.arguments import parse_args
-from models.biaffine_trainer import BERTBiaffineTrainer
+from models.biaffine_trainer import BERTologyBiaffineTrainer
 from models.biaffine_model import BiaffineDependencyModel
 from utils.input_utils.bertology.bert_input_utils import load_bertology_input
 from utils.input_utils.graph_vocab import GraphVocab
@@ -42,7 +42,10 @@ def load_trainer(args):
         args.parallel_train = True
     else:
         args.parallel_train = False
-    trainer = BERTBiaffineTrainer(args, model)
+    if args.encoder_type == 'bertology':
+        trainer = BERTologyBiaffineTrainer(args, model)
+    else:
+        raise ValueError('Encoder Type not supported temporarily')
     return trainer
 
 
