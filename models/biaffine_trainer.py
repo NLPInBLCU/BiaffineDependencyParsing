@@ -154,6 +154,9 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
 
                 if global_step % self.args.eval_interval == 0:
                     summary_writer.add_scalar('loss/train', loss, global_step)
+                    # 记录学习率
+                    for i, param_group in enumerate(self.optimizer.param_groups):
+                        summary_writer.add_scalar(f'lr/group_{i}', param_group['lr'], global_step)
                     if dev_data_loader:
                         UAS, LAS = self.dev(dev_data_loader, dev_CoNLLU_file)
                         summary_writer.add_scalar('metrics/uas', UAS, global_step)
@@ -275,7 +278,7 @@ class BERTologyBiaffineTrainer(BiaffineDependencyTrainer):
                 # 利用正则识别参数名，对其进行freeze
                 for name, para in self.model.named_parameters():
                     # Freeze BERTology embedding layer
-                    if re.match(f'^.+encoder\.bertology\.embeddings\..+', name):
+                    if 'encoder.bertology.embeddings.' in name:
                         para.requires_grad = False
                         self._freeze_parameter_names.append(name)
                     # Freeze other BERTology Layers
