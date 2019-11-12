@@ -50,6 +50,10 @@ BERTology:
   bertology_after: 'transformer'
   after_layers: 2
   after_dropout: 0.2
+BERTologyInputMask:
+  input_mask: false
+  input_mask_prob: 0.1
+  input_mask_granularity: 'char' # char or word
 BERTologyFreeze:
   freeze: false # freeze的控制开关，如果为false则无论下述参数为何都不使用freeze
   freeze_bertology_layers: 3 # -1:frezze BERT embedding 层; 0：只freeze最底层; 3：freeze 0,1,2,3层; 11: freeze Base model所有层

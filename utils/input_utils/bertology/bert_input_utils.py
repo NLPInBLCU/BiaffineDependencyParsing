@@ -3,6 +3,7 @@
 import os
 import pathlib
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from utils.input_utils.conll_file import load_conllu_file
@@ -60,10 +61,14 @@ class CoNLLUProcessor(object):
     #     CoNLLU_file, CoNLLU_data = load_conllu_file(os.path.join(data_dir, file_name))
     #     return self._create_bert_example(CoNLLU_data, 'train', max_seq_length), CoNLLU_file
 
-    def get_examples(self, file_path, max_seq_length):
+    def get_examples(self, file_path, max_seq_length, training=False):
         """Gets a collection of `InputExample`s for the dev set."""
         CoNLLU_file, CoNLLU_data = load_conllu_file(file_path)
-        return self._create_bert_example(CoNLLU_data, 'dev', max_seq_length), CoNLLU_file
+        return self._create_bert_example(CoNLLU_data,
+                                         'train' if training else 'dev',
+                                         max_seq_length,
+                                         training=training,
+                                         ), CoNLLU_file
 
     def _get_words_start_end_pos(self, words_list, max_seq_length):
         s = []
@@ -94,12 +99,14 @@ class CoNLLUProcessor(object):
             s.append(sum_len) if sum_len < max_seq_length else s.append(max_seq_length - 1)
             if w.lower() not in self.word_vocab:  # 如果单词不在词表中，说明会被分割，要分开计算
                 sum_len += len(w)
-            else:  # 如果单词在词表中，可以视长度为1
+            else:
+                # 如果单词在词表中，可以视长度为1
+                # 注意[MASK],[unused1]等特殊字符都在BERT的vocab中
                 sum_len += 1
             e.append(sum_len - 1) if sum_len - 1 < max_seq_length else e.append(max_seq_length - 1)
         return s, e
 
-    def _create_bert_example(self, CoNLLU_data, set_type, max_seq_length):
+    def _create_bert_example(self, CoNLLU_data, set_type, max_seq_length, training=False):
         examples = []
         # print(CoNLLU_data)
         for i, sent in enumerate(CoNLLU_data):
@@ -135,10 +142,30 @@ class CoNLLUProcessor(object):
                 words.append(line[0])
             if not deps:
                 deps = None
+
+            sentence = "".join(words)
+            if self.args.input_mask and training:
+                # input_mask应该只在training的时候使用
+                if self.args.input_mask_granularity == 'char':
+                    input_mask = np.random.uniform(0, 1, len(sentence)) < self.args.input_mask_prob
+                    # 注意这里我们只对正文字符做mask，
+                    # 因为英文单词不是逐个字符切分，如果对英文字符mask可能使得分词后的总长度变化
+                    # 而中文是逐个字切分，即使做了mask也不影响分词后的长度
+                    chars = ['[MASK]' if (z[1] and '\u4e00' <= z[0] <= '\u9fa5') else z[0] for z in
+                             zip(sentence, input_mask)]
+                    sentence = ''.join(chars)
+                else:
+                    # 单词粒度的mask
+                    # 注意单词粒度的mask破坏了句子的长度！
+                    # 因此_get_words_start_end_pos必须在mask操作之后执行
+                    input_mask = np.random.uniform(0, 1, len(words)) < self.args.input_mask_prob
+                    words = ['[MASK]' if z[1] else z[0] for z in zip(words, input_mask)]
+                    sentence = "".join(words)
+
             start_pos, end_pos = self._get_words_start_end_pos(words, max_seq_length)
-            # print(words)
+
             examples.append(
-                InputExample(guid=guid, sentence="".join(words), start_pos=start_pos, end_pos=end_pos, deps=deps)
+                InputExample(guid=guid, sentence=sentence, start_pos=start_pos, end_pos=end_pos, deps=deps)
             )
         return examples
 
@@ -302,12 +329,12 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
     return features
 
 
-def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer):
+def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, training=False):
     word_vocab = tokenizer.vocab if args.encoder_type == 'bertology' else None
     processor = CoNLLUProcessor(args, graph_vocab, word_vocab)
 
     label_list = graph_vocab.get_labels()
-    examples, CoNLLU_file = processor.get_examples(conllu_file_path, args.max_seq_len)
+    examples, CoNLLU_file = processor.get_examples(conllu_file_path, args.max_seq_len, training=training)
     features = convert_examples_to_features(examples, label_list, args.max_seq_len, tokenizer,
                                             cls_token_at_end=bool(args.encoder_type in ['xlnet']),
                                             # xlnet has a cls token at the end
@@ -364,14 +391,14 @@ def load_bertology_input(args):
     if args.run_mode == 'train':
         tokenizer.save_pretrained(args.output_model_dir)
     if args.run_mode in ['dev', 'inference']:
-        dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_file, vocab, tokenizer)
+        dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_file, vocab, tokenizer, training=False)
         data_loader = get_data_loader(dataset, batch_size=args.eval_batch_size, evaluation=True)
         return data_loader, conllu_file
     elif args.run_mode == 'train':
         train_dataset, train_conllu_file = load_and_cache_examples(args, os.path.join(args.data_dir, args.train_file),
-                                                                   vocab, tokenizer)
+                                                                   vocab, tokenizer, training=True)
         dev_dataset, dev_conllu_file = load_and_cache_examples(args, os.path.join(args.data_dir, args.dev_file),
-                                                               vocab, tokenizer)
+                                                               vocab, tokenizer, training=False)
         train_data_loader = get_data_loader(train_dataset, batch_size=args.train_batch_size, evaluation=False)
         dev_data_loader = get_data_loader(dev_dataset, batch_size=args.dev_batch_size, evaluation=True)
         return train_data_loader, train_conllu_file, dev_data_loader, dev_conllu_file

@@ -13,17 +13,17 @@
 - [x] 按照单词数量均分loss
 - [x] 调整BERT 优化器的参数
 - [x] 保存、加载
+- [x] 模型部分参数冻结
+- [x] Input Masking
 ## High Priority
 - [ ] 调整学习率、最大步数、warmup prop
-- [ ] Input Masking
 - [ ] 多领域数据的采样（参考多语BERT-指数平滑加权）
 - [ ] 多任务训练 + POS 标注
 - [ ] 解决Biaffine分类（二分类、多分类）的类别不平衡问题
-- [ ] 加入Label Smoothing,缺少ignore_index的实现
+- [ ] **加入Label Smoothing,缺少ignore_index的实现**
 - [ ] 重构预测得到probs的后处理部分
 - [ ] 支持roberta
 - [ ] 模型参数不同学习率
-- [ ] 模型部分参数冻结 
 ## Middle Priority
 - [ ] 保存加载预处理的dataset
 - [ ] decoder部分的参数初始化
