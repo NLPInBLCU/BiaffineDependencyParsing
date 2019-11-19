@@ -20,7 +20,7 @@ from datetime import datetime
 from utils.arguments import parse_args
 from models.biaffine_trainer import BERTologyBiaffineTrainer
 from models.biaffine_model import BiaffineDependencyModel
-from utils.input_utils.bertology.bert_input_utils import load_bertology_input
+from utils.input_utils.bertology.input_utils import load_bertology_input
 from utils.input_utils.graph_vocab import GraphVocab
 from utils.seed import set_seed
 from utils.timer import Timer
@@ -91,7 +91,7 @@ def train(args):
 
     with Timer('load input'):
         # 目前仅仅支持BERTology形式的输入
-        train_data_loader, train_conllu, dev_data_loader, dev_conllu = load_bertology_input(args)
+        train_data_loader, _, dev_data_loader, dev_conllu = load_bertology_input(args)
 
     print(f'train batch size: {args.train_batch_size}')
     print(f'train data batch num: {len(train_data_loader)}')
