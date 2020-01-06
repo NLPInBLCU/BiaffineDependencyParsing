@@ -16,6 +16,7 @@ import utils.model_utils.sdp_simple_scorer as sdp_scorer
 from utils.best_result import BestResult
 from utils.seed import set_seed
 from utils.model_utils.label_smoothing import label_smoothed_kl_div_loss
+from utils.logger import get_logger
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -29,6 +30,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         self.optimizer = self.optim_scheduler = None
         self.graph_vocab = GraphVocab(args.graph_vocab_file)
         self.args = args
+        self.logger = get_logger(args.log_name)
 
     @abstractmethod
     def _unpack_batch(self, args, batch):
@@ -96,9 +98,9 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                 loss.backward()
                 if self.args.max_grad_norm > 0:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
+                self.optimizer.step()
                 if self.optim_scheduler:
                     self.optim_scheduler.step()  # Update learning rate schedule
-                self.optimizer.step()
                 self.model.zero_grad()
             loss = loss.detach().cpu().item()
         else:
@@ -154,13 +156,16 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
 
                 if global_step % self.args.eval_interval == 0:
                     summary_writer.add_scalar('loss/train', loss, global_step)
+                    # 记录学习率
+                    for i, param_group in enumerate(self.optimizer.param_groups):
+                        summary_writer.add_scalar(f'lr/group_{i}', param_group['lr'], global_step)
                     if dev_data_loader:
                         UAS, LAS = self.dev(dev_data_loader, dev_CoNLLU_file)
                         summary_writer.add_scalar('metrics/uas', UAS, global_step)
                         summary_writer.add_scalar('metrics/las', LAS, global_step)
                         if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
-                            print(f"\n## NEW BEST RESULT in epoch {epoch} ##")
-                            print(best_result)
+                            self.logger.info(f"\n## NEW BEST RESULT in epoch {epoch} ##")
+                            self.logger.info('\n' + str(best_result))
                             # 保存最优模型：
                             if hasattr(self.model, 'module'):
                                 # 多卡,torch.nn.DataParallel封装model
@@ -169,7 +174,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                                 self.model.save_pretrained(self.args.output_model_dir)
 
                 if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
-                    print(f'\n## Early stop in step:{global_step} ##')
+                    self.logger.info(f'\n## Early stop in step:{global_step} ##')
                     train_stop = True
                     break
             if train_stop:
@@ -178,8 +183,8 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
             summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
         with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
             f.write(str(best_result) + '\n')
-        print("\n## BEST RESULT in Training ##")
-        print(best_result)
+        self.logger.info("\n## BEST RESULT in Training ##")
+        self.logger.info('\n' + str(best_result))
         summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):
@@ -232,69 +237,6 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         inference_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
         inference_CoNLLU_file.write_conll(output_conllu_path)
         return predictions
-
-
-class BERTologyBiaffineTrainer(BiaffineDependencyTrainer):
-    def __init__(self, config, *args, **kwargs):
-        super().__init__(config, *args, **kwargs)
-        if config.freeze:
-            assert config.freeze_bertology_layers >= -1 and config.freeze_epochs in ['all', 'first']
-        self._freeze = config.freeze
-        self._freeze_layers = config.freeze_bertology_layers
-        self._freeze_epochs = config.freeze_epochs
-        # 记录被freeze的参数名称
-        # 在第一个epoch时刻写入
-        # 之后直接读取这个list中的参数
-        self._freeze_parameter_names = []
-
-    def _unpack_batch(self, args, batch):
-        inputs = {
-            'input_ids': batch[0],
-            'attention_mask': batch[1],
-            'token_type_ids': batch[2] if args.encoder_type in ['bertology', 'xlnet'] else None,
-            'start_pos': batch[3],
-            'end_pos': batch[4],
-        }
-        dep_ids = batch[5]
-        # word_mask:以word为单位，1为真实输入，0为PAD
-        word_mask = (batch[3] != (args.max_seq_len - 1)).to(torch.long).to(args.device)
-        sent_len = torch.sum(word_mask, 1).cpu().tolist()
-        return inputs, word_mask, sent_len, dep_ids
-
-    def _custom_train_operations(self, epoch):
-        """
-            重写BiaffineDependencyTrainer的_custom_train_operations方法，
-            提供定制化的训练操作
-            这里我们做BERTology中某些层的freeze
-        :param epoch:
-        :return:
-        """
-        if self._freeze:
-            if epoch == 1:
-                # 首个epoch一定会freeze
-                # 利用正则识别参数名，对其进行freeze
-                for name, para in self.model.named_parameters():
-                    # Freeze BERTology embedding layer
-                    if re.match(f'^.+encoder\.bertology\.embeddings\..+', name):
-                        para.requires_grad = False
-                        self._freeze_parameter_names.append(name)
-                    # Freeze other BERTology Layers
-                    # 如果self._freeze_layers > -1；则说明除了freeze embedding层之外，还要freeze别的层
-                    if self._freeze_layers > -1:
-                        if re.match(
-                                f'^.+encoder\.bertology\.encoder\.layer\.[0-{self._freeze_layers}]\..+',
-                                name):
-                            para.requires_grad = False
-                        self._freeze_parameter_names.append(name)
-            else:
-                # 如果_freeze_epochs == ‘all’,则此时不需要做任何事情，因为第一个epoch已经freeze过了
-                if self._freeze_epochs == 'first':
-                    # 仅在第一个epoch freeze参数
-                    # epoch大于1的时候不再需要freeze了
-                    # 此时将_freeze_parameter_names中的参数重新设置为需要计算梯度
-                    for name, para in self.model.named_parameters():
-                        if name in self._freeze_parameter_names:
-                            para.requires_grad = True
 
 
 class TransformerBiaffineTrainer(BiaffineDependencyTrainer):

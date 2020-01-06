@@ -13,7 +13,7 @@ Various Encoder Layers (~~vanilla LSTM/Highway Droput LSTM/Transformer/~~BERTolo
 ## 使用
 ### 训练Train
 ```shell
-python main.py -c config_files/bert_biaffine.yaml
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py -c config_files/bert_biaffine.yaml
 ```
 ### 验证Dev
 ```shell

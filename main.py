@@ -10,24 +10,26 @@
                    2019/10/29:
 -------------------------------------------------
 """
-import os
-import random
+import copy
+
 import torch
-import numpy as np
 import pathlib
 import shutil
 from datetime import datetime
+
+import yaml
+
 from utils.arguments import parse_args
-from models.biaffine_trainer import BERTologyBiaffineTrainer
+from trainers.bertology_trainer import BERTologyBiaffineTrainer
 from models.biaffine_model import BiaffineDependencyModel
-from utils.input_utils.bertology.bert_input_utils import load_bertology_input
-from utils.input_utils.graph_vocab import GraphVocab
+from utils.input_utils.bertology.input_utils import load_bertology_input
 from utils.seed import set_seed
 from utils.timer import Timer
 from utils.logger import init_logger, get_logger
 
 
 def load_trainer(args):
+    logger=get_logger(args.log_name)
     if args.run_mode == 'train':
         # 默认train模式下是基于原始BERT预训练模型的参数开始的
         model = BiaffineDependencyModel.from_pretrained(args, initialize_from_bertology=True)
@@ -38,7 +40,7 @@ def load_trainer(args):
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
         model = torch.nn.DataParallel(model)
-        print(f'Parallel Running, GPU num : {args.n_gpu}')
+        logger.info(f'Parallel Running, GPU num : {args.n_gpu}')
         args.parallel_train = True
     else:
         args.parallel_train = False
@@ -84,37 +86,54 @@ def make_output_dir(args):
         init_logger(args.log_name, str(output_dir / 'parser.log'))
 
 
+def save_config_to_yaml(_config):
+    config = copy.deepcopy(_config)
+    if not isinstance(config, dict):
+        config = vars(config)
+    del_keys = []
+    for k, v in config.items():
+        if type(v) not in [list, tuple, str, int, float, bool, None]:
+            del_keys.append(k)
+    for k in del_keys:
+        del config[k]
+    with open(pathlib.Path(config['output_dir']) / 'config.yaml', 'w', encoding='utf-8')as f:
+        yaml.dump(config, f)
+
+
 def train(args):
+    logger = get_logger(args.log_name)
     assert args.run_mode == 'train'
     # 创建输出文件夹，保存运行结果，配置文件，模型参数
     make_output_dir(args)
 
     with Timer('load input'):
         # 目前仅仅支持BERTology形式的输入
-        train_data_loader, train_conllu, dev_data_loader, dev_conllu = load_bertology_input(args)
+        train_data_loader, _, dev_data_loader, dev_conllu = load_bertology_input(args)
 
-    print(f'train batch size: {args.train_batch_size}')
-    print(f'train data batch num: {len(train_data_loader)}')
+    logger.info(f'train batch size: {args.train_batch_size}')
+    logger.info(f'train data batch num: {len(train_data_loader)}')
     # 每个epoch做两次dev：
     args.eval_interval = len(train_data_loader) // 2
-    print(f'eval interval: {args.eval_interval}')
+    logger.info(f'eval interval: {args.eval_interval}')
     # 注意该参数影响学习率warm up
     args.max_train_steps = len(train_data_loader) * args.max_train_epochs
-    print(f'max steps: {args.max_train_steps}')
+    logger.info(f'max steps: {args.max_train_steps}')
     # 如果6个epoch之后仍然不能提升，就停止
     if args.early_stop:
         args.early_stop_steps = len(train_data_loader) * args.early_stop_epochs
-        print(f'early stop steps: {args.early_stop_steps}\n')
+        logger.info(f'early stop steps: {args.early_stop_steps}\n')
     else:
-        print(f'do not use early stop, training will last {args.max_train_epochs} epochs')
+        logger.info(f'do not use early stop, training will last {args.max_train_epochs} epochs')
     with Timer('load trainer'):
         trainer = load_trainer(args)
+    save_config_to_yaml(args)
     with Timer('Train'):
         trainer.train(train_data_loader, dev_data_loader, dev_conllu)
-    print('train DONE')
+    logger.info('train DONE')
 
 
 def dev(args):
+    logger = get_logger(args.log_name)
     # args = trainer.args
     assert args.run_mode == 'dev'
     dev_data_loader, dev_conllu = load_bertology_input(args)
@@ -124,11 +143,12 @@ def dev(args):
         dev_UAS, dev_LAS = trainer.dev(dev_data_loader, dev_conllu,
                                        input_conllu_path=args.input_conllu_path,
                                        output_conllu_path=args.output_conllu_path)
-    print(f'DEV output file saved in {args.output_conllu_path}')
-    print(f'DEV metrics:\nUAS:{dev_UAS}\nLAS:{dev_LAS}')
+    logger.info(f'DEV output file saved in {args.output_conllu_path}')
+    logger.info(f'DEV metrics:\nUAS:{dev_UAS}\nLAS:{dev_LAS}')
 
 
 def inference(args):
+    logger = get_logger(args.log_name)
     # args = trainer.args
     assert args.run_mode == 'inference'
     inference_data_loader, inference_conllu = load_bertology_input(args)
@@ -136,7 +156,7 @@ def inference(args):
         trainer = load_trainer(args)
     with Timer('inference'):
         trainer.inference(inference_data_loader, inference_conllu, output_conllu_path=args.output_conllu_path)
-    print(f'INFERENCE output file saved in {args.output_conllu_path}')
+    logger.info(f'INFERENCE output file saved in {args.output_conllu_path}')
 
 
 def main():

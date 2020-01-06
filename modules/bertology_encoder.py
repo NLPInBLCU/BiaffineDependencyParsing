@@ -14,7 +14,7 @@ from pytorch_transformers import (BertConfig,
                                   XLNetTokenizer, BertModel)
 
 from utils.information import debug_print
-from utils.input_utils.bertology.bert_input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
+from utils.input_utils.bertology.input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
 from utils.input_utils.graph_vocab import GraphVocab
 from modules.layer_attention import LayerAttention
 from modules.transformer_layer import TransformerSentenceEncoderLayer
@@ -143,35 +143,3 @@ class BERTologyEncoder(nn.Module):
             # Seq_len X batch X dim -> batch X Seq_len X dim
             encoder_output = encoder_output.transpose(0, 1)
         return self.dropout(encoder_output)
-
-
-if __name__ == '__main__':
-    class Args():
-        def __init__(self):
-            self.bert_path = '/home/liangs/disk/data/bertology-base-chinese'
-            self.data_dir = '../dataset'
-            self.train_file = 'test.conllu'
-            self.max_seq_length = 10
-            self.encoder_type = 'bertology'
-            self.root_representation = 'unused'
-
-
-    args = Args()
-
-    tokenizer = load_bert_tokenizer('/home/liangs/disk/data/bertology-base-chinese', 'bertology')
-    vocab = GraphVocab('../dataset/graph_vocab.txt')
-    dataset, CoNLLU_file = load_and_cache_examples(args, vocab, tokenizer)
-    data_loader = get_data_loader(dataset, batch_size=2, evaluation=True)
-    bertology = BERTologyEncoder(no_cuda=True, bert_path=args.bert_path)
-    for batch in data_loader:
-        inputs = {
-            'input_ids': batch[0],
-            'attention_mask': batch[1],
-            'token_type_ids': batch[2] if args.encoder_type in ['bertology', 'xlnet'] else None,
-            'start_pos': batch[3],
-            'end_pos': batch[4],
-        }
-        # print(inputs)
-        # # print(inputs['start_pos'])
-        # output = bertology(**inputs)
-        # print(output)
