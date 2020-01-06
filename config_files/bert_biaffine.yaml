@@ -17,12 +17,13 @@ data_set:
   data_dir: 'dataset'
   train_file: 'train/text_news.train.conllu'
   dev_file: 'dev/sdp_text_dev.conllu'
-  # GPU 32GB:80; 24GB:64; 12GB:32; 10GB:20
-  per_gpu_train_batch_size: 12
+  # GPU 32GB:80; 24GB:64; 16GB:40 12GB:30 10GB:20
+  per_gpu_train_batch_size: 40
   # GPU <=12GB:10; >12GB:20或者30
-  per_gpu_eval_batch_size: 10
+  per_gpu_eval_batch_size: 20
   skip_too_long_input: true
 merge_train_data:
+  # 幂指数加权采样：在多个不同领域数据之间如何合理地采样
   # 是够采用幂指数平滑采样: utils.input_utils.custom_dataset.ConcatTensorRandomDataset
   merge_training: false
   train_text_file: 'train/sdp_text_train.conllu'
@@ -41,6 +42,8 @@ graph_vocab:
   graph_vocab_file: 'dataset/graph_vocab.txt'
 Model:
   saved_model_path: '/search/hadoop02/suanfa/lihuayong/data/pretrain/ernie_1/'
+#  saved_model_path: ''
+#  saved_model_path: ''
 encoder:
   #encoder的类型：bertology,transformer,lstm ....
   encoder_type: 'bertology'
@@ -61,22 +64,30 @@ BERTology:
   after_layers: 2
   after_dropout: 0.2
 BERTologyInputMask:
+  # 是否使用InputMask
+  # 类似word dropout
   input_mask: false
   input_mask_prob: 0.1
   input_mask_granularity: 'char' # char or word
 BERTologyFreeze:
+  # 是否冻结BERT的参数
+  # 冻结底层参数可以减小显存占用，加快训练
   freeze: false # freeze的控制开关，如果为false则无论下述参数为何都不使用freeze
   freeze_bertology_layers: 3 # -1:frezze BERT embedding 层; 0：只freeze最底层; 3：freeze 0,1,2,3层; 11: freeze Base model所有层
   freeze_epochs: 'all' # all:一直freeze; first:只在首个epoch freeze:
 decoder:
   biaffine_hidden_dim: 600
   biaffine_dropout: 0.33
+  # direct_biaffine： 不使用全连接，直接把encoder的表示传给双仿
   direct_biaffine: false
 update:
+  # 是否用可学习的loss—ratio（用来控制两种loss的组合）
   learned_loss_ratio: true
   label_loss_ratio: 0.5
+  # 是够缩放loss（有用吗？）
   scale_loss: false
   loss_scaling_ratio: 2
+  # 标签平滑系数（现在没有实现标签平滑 todo）
   label_smoothing: 0.03
   # =0则不使用梯度裁剪
   max_grad_norm: 5.0
@@ -93,6 +104,6 @@ update:
   # bertDistill:1.0e-6;
   adam_epsilon: 1.0e-8
   # bertDistill:0.05;
-  warmup_prop: 0.05
+  warmup_prop: 0.1
   # 是够按照单词数量平均一个batch的loss
   average_loss_by_words_num: true
