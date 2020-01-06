@@ -18,16 +18,19 @@ data_set:
   train_file: 'train/text_news.train.conllu'
   dev_file: 'dev/sdp_text_dev.conllu'
   # GPU 32GB:80; 24GB:64; 12GB:32; 10GB:20
-  per_gpu_train_batch_size: 20
+  per_gpu_train_batch_size: 12
   # GPU <=12GB:10; >12GB:20或者30
   per_gpu_eval_batch_size: 10
   skip_too_long_input: true
 merge_train_data:
+  # 是够采用幂指数平滑采样: utils.input_utils.custom_dataset.ConcatTensorRandomDataset
   merge_training: false
   train_text_file: 'train/sdp_text_train.conllu'
   train_news_file: 'train/sdp_news_train.conllu'
   merge_train_mode: 'exp'  # exp or prob
+  # 仅在merge_train_mode == 'exp' 时生效
   merge_train_exp: 0.7
+  # 仅在merge_train_mode == 'prob' 时生效
   merge_train_prob: [0.6,0.4]
 output:
   output_dir: 'output'
@@ -37,7 +40,7 @@ graph_vocab:
   #依存弧的vocab，必须提前生成
   graph_vocab_file: 'dataset/graph_vocab.txt'
 Model:
-  saved_model_path: '/data/private/lhy/data/baidu_ERNIE/'
+  saved_model_path: '/search/hadoop02/suanfa/lihuayong/data/pretrain/ernie_1/'
 encoder:
   #encoder的类型：bertology,transformer,lstm ....
   encoder_type: 'bertology'
@@ -91,4 +94,5 @@ update:
   adam_epsilon: 1.0e-8
   # bertDistill:0.05;
   warmup_prop: 0.05
+  # 是够按照单词数量平均一个batch的loss
   average_loss_by_words_num: true

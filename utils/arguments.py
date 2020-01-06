@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument('--model_path', default=None, help='预先训练好的模型路径（文件夹）')
     parser.add_argument('--input', default=None, help='输入的CONLL-U文件，用来dev或者inference')
     parser.add_argument('--output', default=None, help='dev或者inference的输出文件')
-    parser.add_argument('--use_cuda', action='store_true', default=False, help='仅仅影响dev或者inference模式。train模式下用yaml控制')
+    parser.add_argument('--use_cpu', action='store_true', default=False, help='')
     args = parser.parse_args()
     if args.run in ['dev', 'inference']:
         assert args.model_path and args.input and args.output
@@ -40,9 +40,9 @@ def parse_args():
                 args_dict[k] = v
     args_dict['config_file'] = args.config_file
     args_dict['run_mode'] = args.run
+    args_dict['cuda'] = not args.use_cpu
+    args_dict['cpu'] = args.use_cpu
     if args.run in ['dev', 'inference']:
-        args_dict['cuda'] = args.use_cuda
-        args_dict['cpu'] = not args.use_cuda
         # 覆盖模型路径
         args_dict['saved_model_path'] = args.model_path
         args_dict['input_conllu_path'] = args.input

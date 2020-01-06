@@ -44,6 +44,7 @@ class ConcatTensorRandomDataset(Dataset):
             pes = np.exp(probs_exp)
             self.probs = pes / np.sum(pes)
         else:
+            assert isinstance(probs, list) and probs
             self.probs = np.array(probs)
         self.sample_total_length = np.sum(self.original_lengths * self.probs)
 

@@ -6,5 +6,5 @@ fairseq==0.8.0
 ConfigArgParse==0.14.0
 numpy==1.16.4
 torch==1.2.0
-tensorboardX==1.9
-PyYAML==5.1.2
+tensorboardX>=1.9
+PyYAML>=5.1.2
