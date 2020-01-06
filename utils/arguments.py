@@ -16,6 +16,20 @@ class ArgsClass(object):
             setattr(self, k, v)
 
 
+def parser_args_from_yaml(yaml_file):
+    yaml_config = yaml.load(open(yaml_file, encoding='utf-8'))
+    args_dict = {}
+    for sub_k, sub_v in yaml_config.items():
+        if isinstance(sub_v, dict):
+            for k, v in sub_v.items():
+                if k in args_dict.keys():
+                    raise ValueError(f'Duplicate parameter : {k}')
+                args_dict[k] = v
+        else:
+            args_dict[sub_k] = sub_v
+    return args_dict
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_file', required=True)
@@ -30,14 +44,16 @@ def parse_args():
         assert args.model_path and args.input and args.output
         assert pathlib.Path(args.model_path).is_dir()
         assert pathlib.Path(args.input).is_file()
-    yaml_config = yaml.load(open(args.config_file, encoding='utf-8'))
-    args_dict = {}
-    for sub_dict in yaml_config.values():
-        if sub_dict:
-            for k, v in sub_dict.items():
-                if k in args_dict.keys():
-                    raise ValueError(f'Duplicate parameter : {k}')
-                args_dict[k] = v
+    if args.run == 'train':
+        assert args.config_file is not None
+        yaml_config_file = args.config_file
+    else:
+        assert args.model_path and args.input and args.output
+        assert pathlib.Path(args.input).is_file()
+        assert (pathlib.Path(args.model_path) / 'model').is_dir()
+        assert (pathlib.Path(args.model_path) / 'config.yaml').is_file()
+        yaml_config_file = (pathlib.Path(args.model_path) / 'config.yaml')
+    args_dict = parser_args_from_yaml(yaml_config_file)
     args_dict['config_file'] = args.config_file
     args_dict['run_mode'] = args.run
     args_dict['cuda'] = not args.use_cpu

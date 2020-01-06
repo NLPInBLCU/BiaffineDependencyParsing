@@ -10,21 +10,22 @@
                    2019/10/29:
 -------------------------------------------------
 """
-import os
-import random
+import copy
+
 import torch
-import numpy as np
 import pathlib
 import shutil
 from datetime import datetime
+
+import yaml
+
 from utils.arguments import parse_args
-from models.biaffine_trainer import BERTologyBiaffineTrainer
+from trainers.bertology_trainer import BERTologyBiaffineTrainer
 from models.biaffine_model import BiaffineDependencyModel
 from utils.input_utils.bertology.input_utils import load_bertology_input
-from utils.input_utils.graph_vocab import GraphVocab
 from utils.seed import set_seed
 from utils.timer import Timer
-from utils.logger import init_logger, get_logger
+from utils.logger import init_logger
 
 
 def load_trainer(args):
@@ -84,6 +85,20 @@ def make_output_dir(args):
         init_logger(args.log_name, str(output_dir / 'parser.log'))
 
 
+def save_config_to_yaml(_config):
+    config = copy.deepcopy(_config)
+    if not isinstance(config, dict):
+        config = vars(config)
+    del_keys = []
+    for k, v in config.items():
+        if type(v) not in [list, tuple, str, int, float, bool, None]:
+            del_keys.append(k)
+    for k in del_keys:
+        del config[k]
+    with open(pathlib.Path(config['output_dir']) / 'config.yaml', 'w', encoding='utf-8')as f:
+        yaml.dump(config, f)
+
+
 def train(args):
     assert args.run_mode == 'train'
     # 创建输出文件夹，保存运行结果，配置文件，模型参数
@@ -109,6 +124,7 @@ def train(args):
         print(f'do not use early stop, training will last {args.max_train_epochs} epochs')
     with Timer('load trainer'):
         trainer = load_trainer(args)
+    save_config_to_yaml(args)
     with Timer('Train'):
         trainer.train(train_data_loader, dev_data_loader, dev_conllu)
     print('train DONE')
