@@ -165,7 +165,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                         summary_writer.add_scalar('metrics/las', LAS, global_step)
                         if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
                             self.logger.info(f"\n## NEW BEST RESULT in epoch {epoch} ##")
-                            self.logger.info(best_result)
+                            self.logger.info('\n' + str(best_result))
                             # 保存最优模型：
                             if hasattr(self.model, 'module'):
                                 # 多卡,torch.nn.DataParallel封装model
@@ -184,7 +184,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
             f.write(str(best_result) + '\n')
         self.logger.info("\n## BEST RESULT in Training ##")
-        self.logger.info(best_result)
+        self.logger.info('\n' + str(best_result))
         summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):

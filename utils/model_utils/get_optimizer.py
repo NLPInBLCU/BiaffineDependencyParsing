@@ -60,7 +60,7 @@ def _get_bertology_different_lr_grouped_parameters(args, model):
             'lr': args.bertology_lr,
         },
         {
-            'params': params_other_no_decay,
+            'params': params_bert_no_decay,
             'weight_decay': 0.0,
             'lr': args.bertology_lr,
         },

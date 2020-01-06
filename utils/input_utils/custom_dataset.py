@@ -32,6 +32,8 @@ class ConcatTensorRandomDataset(Dataset):
         else:
             assert exp and 0 < exp < 1
         self.datasets = list(datasets)
+        self.dataset_idxs = list(range(len(self.datasets)))
+        self.dataset_lens = [len(x) for x in self.datasets]
         self.original_lengths = []  # 记录每个源的原始数据长度
         for d in self.datasets:
             assert not isinstance(d, IterableDataset), "ConcatDataset does not support IterableDataset"
@@ -49,7 +51,7 @@ class ConcatTensorRandomDataset(Dataset):
         self.sample_total_length = np.sum(self.original_lengths * self.probs)
 
     def __len__(self):
-        return self.sample_total_length
+        return int(self.sample_total_length)
 
     def __getitem__(self, idx):
         if idx < 0:
@@ -57,7 +59,7 @@ class ConcatTensorRandomDataset(Dataset):
                 raise ValueError("absolute value of index should not exceed dataset length")
             idx = len(self) + idx
         # 依据概率决定从哪个源采样
-        target_dataset = np.random.choice(self.datasets, p=self.probs)
-        # 从目标源随机采样
-        sample_idx = np.random.choice(range(len(target_dataset)))
-        return target_dataset[sample_idx]
+        target_dataset_idx = np.random.choice(self.dataset_idxs, p=self.probs)
+        # 从目标源采样
+        sample_idx = idx % self.dataset_lens[target_dataset_idx]
+        return self.datasets[target_dataset_idx][sample_idx]

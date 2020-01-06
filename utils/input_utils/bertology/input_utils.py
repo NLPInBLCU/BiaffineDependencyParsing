@@ -7,6 +7,7 @@ from utils.input_utils.bertology.input_class import *
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
 from utils.input_utils.custom_dataset import ConcatTensorRandomDataset
+from utils.logger import get_logger
 
 BERTology_TOKENIZER = {
     'bert': BertTokenizer,
@@ -216,12 +217,15 @@ def feature_to_dataset(features):
     return dataset
 
 
-def get_data_loader(dataset, batch_size, evaluation=False):
+def get_data_loader(dataset, batch_size, evaluation=False, custom_dataset=False, num_worker=6):
     if evaluation:
         sampler = SequentialSampler(dataset)
     else:
-        sampler = RandomSampler(dataset)
-    data_loader = DataLoader(dataset, sampler=sampler, batch_size=batch_size)
+        if not custom_dataset:
+            sampler = RandomSampler(dataset)
+        else:
+            sampler = None
+    data_loader = DataLoader(dataset, sampler=sampler, batch_size=batch_size, num_workers=num_worker)
     return data_loader
 
 
@@ -233,6 +237,8 @@ def load_bert_tokenizer(model_path, model_type, do_lower_case=True):
 
 
 def load_bertology_input(args):
+    logger = get_logger(args.log_name)
+    logger.info(f'data loader worker num: {args.loader_worker_num}')
     assert (pathlib.Path(args.saved_model_path) / 'vocab.txt').exists()
     tokenizer = load_bert_tokenizer(args.saved_model_path, args.bertology_type)
     vocab = GraphVocab(args.graph_vocab_file)
@@ -241,7 +247,8 @@ def load_bertology_input(args):
     if args.run_mode in ['dev', 'inference']:
         # training 影响 Input Mask
         dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_path, vocab, tokenizer, training=False)
-        data_loader = get_data_loader(dataset, batch_size=args.eval_batch_size, evaluation=True)
+        data_loader = get_data_loader(dataset, batch_size=args.eval_batch_size, evaluation=True,
+                                      num_worker=args.loader_worker_num)
         return data_loader, conllu_file
     elif args.run_mode == 'train':
         if not args.merge_training:
@@ -249,6 +256,7 @@ def load_bertology_input(args):
                                                                        os.path.join(args.data_dir, args.train_file),
                                                                        vocab, tokenizer, training=True)
         else:
+            logger.info(f'merge train: use the ConcatTensorRandomDataset!!!')
             train_text_dataset, _ = load_and_cache_examples(args,
                                                             os.path.join(args.data_dir, args.train_text_file),
                                                             vocab, tokenizer, training=True)
@@ -259,10 +267,14 @@ def load_bertology_input(args):
                                                       probs=None,
                                                       exp=args.merge_train_exp,
                                                       mode=args.merge_train_mode)
+            # 此时无法产生正确的train_conllu_file，不过所幸训练时可以不用train_conllu_file（不过这样就无法计算train metrics了）
+            train_conllu_file = None
 
-        train_data_loader = get_data_loader(train_dataset, batch_size=args.train_batch_size, evaluation=False)
+        train_data_loader = get_data_loader(train_dataset, batch_size=args.train_batch_size, evaluation=False,
+                                            custom_dataset=args.merge_training, num_worker=args.loader_worker_num)
 
         dev_dataset, dev_conllu_file = load_and_cache_examples(args, os.path.join(args.data_dir, args.dev_file),
                                                                vocab, tokenizer, training=False)
-        dev_data_loader = get_data_loader(dev_dataset, batch_size=args.eval_batch_size, evaluation=True)
+        dev_data_loader = get_data_loader(dev_dataset, batch_size=args.eval_batch_size, evaluation=True,
+                                          num_worker=args.loader_worker_num)
         return train_data_loader, train_conllu_file, dev_data_loader, dev_conllu_file

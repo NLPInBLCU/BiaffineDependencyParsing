@@ -162,7 +162,6 @@ def inference(args):
 def main():
     with Timer('parse args'):
         args = parse_args()
-    logger = init_logger(args.log_name)
     # 添加多卡运行下的配置参数
     # BERT训练须在多卡下运行，单卡非常慢
     config_for_multi_gpu(args)
