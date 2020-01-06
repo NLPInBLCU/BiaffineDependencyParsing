@@ -34,7 +34,7 @@ merge_train_data:
   merge_train_prob: [0.6,0.4]
 output:
   output_dir: 'output'
-  log_name: 'parser'
+  log_name: 'bert_parser'
   save_best_model: false
 graph_vocab:
   #依存弧的vocab，必须提前生成

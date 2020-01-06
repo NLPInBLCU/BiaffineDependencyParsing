@@ -16,6 +16,7 @@ import utils.model_utils.sdp_simple_scorer as sdp_scorer
 from utils.best_result import BestResult
 from utils.seed import set_seed
 from utils.model_utils.label_smoothing import label_smoothed_kl_div_loss
+from utils.logger import get_logger
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -29,6 +30,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         self.optimizer = self.optim_scheduler = None
         self.graph_vocab = GraphVocab(args.graph_vocab_file)
         self.args = args
+        self.logger = get_logger(args.log_name)
 
     @abstractmethod
     def _unpack_batch(self, args, batch):
@@ -162,8 +164,8 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                         summary_writer.add_scalar('metrics/uas', UAS, global_step)
                         summary_writer.add_scalar('metrics/las', LAS, global_step)
                         if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
-                            print(f"\n## NEW BEST RESULT in epoch {epoch} ##")
-                            print(best_result)
+                            self.logger.info(f"\n## NEW BEST RESULT in epoch {epoch} ##")
+                            self.logger.info(best_result)
                             # 保存最优模型：
                             if hasattr(self.model, 'module'):
                                 # 多卡,torch.nn.DataParallel封装model
@@ -172,7 +174,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                                 self.model.save_pretrained(self.args.output_model_dir)
 
                 if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
-                    print(f'\n## Early stop in step:{global_step} ##')
+                    self.logger.info(f'\n## Early stop in step:{global_step} ##')
                     train_stop = True
                     break
             if train_stop:
@@ -181,8 +183,8 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
             summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
         with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
             f.write(str(best_result) + '\n')
-        print("\n## BEST RESULT in Training ##")
-        print(best_result)
+        self.logger.info("\n## BEST RESULT in Training ##")
+        self.logger.info(best_result)
         summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):
@@ -235,9 +237,6 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         inference_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
         inference_CoNLLU_file.write_conll(output_conllu_path)
         return predictions
-
-
-
 
 
 class TransformerBiaffineTrainer(BiaffineDependencyTrainer):

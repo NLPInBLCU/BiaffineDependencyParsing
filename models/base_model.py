@@ -6,7 +6,6 @@ import pathlib
 import torch
 import torch.nn as nn
 
-
 class BaseModel(nn.Module):
     """
         所有model的父类；实现了保存了加载方法，
