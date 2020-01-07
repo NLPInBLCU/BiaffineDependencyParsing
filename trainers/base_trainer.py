@@ -24,7 +24,7 @@ except ImportError:
     from tensorboardX import SummaryWriter
 
 
-class BiaffineDependencyTrainer(metaclass=ABCMeta):
+class BaseDependencyTrainer(metaclass=ABCMeta):
     def __init__(self, args, model):
         self.model = model
         self.optimizer = self.optim_scheduler = None
@@ -95,13 +95,30 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
             if update:
+                """
+                    Ref:https://discuss.pytorch.org/t/model-zero-grad-or-optimizer-zero-grad/28426/5
+                    Dmitry A. Konovalov:
+                        model.zero_grad() and optimizer.zero_grad() are the same IF all your model parameters 
+                        are in that optimizer. 
+                        I found it is safer to call model.zero_grad() to make sure all grads are zero, 
+                        e.g. if you have two or more optimizers for one model.
+                    Ref:https://discuss.pytorch.org/t/zero-grad-optimizer-or-net/1887/9
+                    ptrblck：
+                         if you pass all parameters of your model to the optimizer, both calls will be equal.
+                         model.zero_grad() would clear all parameters of the model, 
+                         while the optimizerX.zero_grad() call will just clean 
+                         the gradients of the parameters that were passed to it.
+                """
+                # loss.backward() **之前** 清空模型梯度
+                self.model.zero_grad()
+                # 参看上述注释，这里只需要model.zero_grad()
+                # self.optimizer.zero_grad()
                 loss.backward()
                 if self.args.max_grad_norm > 0:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
                 self.optimizer.step()
                 if self.optim_scheduler:
                     self.optim_scheduler.step()  # Update learning rate schedule
-                self.model.zero_grad()
             loss = loss.detach().cpu().item()
         else:
             loss = None
@@ -239,12 +256,12 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         return predictions
 
 
-class TransformerBiaffineTrainer(BiaffineDependencyTrainer):
+class TransformerBaseTrainer(BaseDependencyTrainer):
     def _unpack_batch(self, args, batch):
         pass
 
 
-class CharRNNBiaffineTrainer(BiaffineDependencyTrainer):
+class CharRNNBaseTrainer(BaseDependencyTrainer):
     pass
 
 

@@ -2,10 +2,10 @@
 # Created by li huayong on 2020/1/6
 import re
 import torch
-from trainers.biaffine_trainer import BiaffineDependencyTrainer
+from trainers.base_trainer import BaseDependencyTrainer
 
 
-class BERTologyBiaffineTrainer(BiaffineDependencyTrainer):
+class BERTologyBaseTrainer(BaseDependencyTrainer):
     def __init__(self, config, *args, **kwargs):
         super().__init__(config, *args, **kwargs)
         if config.freeze:

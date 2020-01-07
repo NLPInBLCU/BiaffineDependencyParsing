@@ -20,7 +20,7 @@ from datetime import datetime
 import yaml
 
 from utils.arguments import parse_args
-from trainers.bertology_trainer import BERTologyBiaffineTrainer
+from trainers.bertology_trainer import BERTologyBaseTrainer
 from models.biaffine_model import BiaffineDependencyModel
 from utils.input_utils.bertology.input_utils import load_bertology_input
 from utils.seed import set_seed
@@ -39,13 +39,16 @@ def load_trainer(args):
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
+        # 使用 DataParallel 多卡并行计算
+        # 值得注意的是，模型和数据都需要先 load 进 GPU 中，
+        # DataParallel 的 module 才能对其进行处理，否则会报错
         model = torch.nn.DataParallel(model)
         logger.info(f'Parallel Running, GPU num : {args.n_gpu}')
         args.parallel_train = True
     else:
         args.parallel_train = False
     if args.encoder_type == 'bertology':
-        trainer = BERTologyBiaffineTrainer(args, model)
+        trainer = BERTologyBaseTrainer(args, model)
     else:
         raise ValueError('Encoder Type not supported temporarily')
     return trainer
