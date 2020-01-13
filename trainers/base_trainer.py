@@ -4,7 +4,7 @@ import os
 import re
 import torch
 import torch.nn as nn
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from abc import ABCMeta, abstractmethod
 
 from utils.information import debug_print
@@ -144,10 +144,11 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
         self.model.zero_grad()
         set_seed(self.args)  # Added here for reproductibility (even between python 2 and 3)
         train_stop = False
-        summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
+        if self.args.local_rank in [-1, 0]:
+            summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
         for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
-            train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}')
+            train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}',disable=self.args.local_rank not in [-1, 0])
             # 某些模型在训练时可能需要一些定制化的操作，默认什么都不做
             # 具体参考子类中_custom_train_operations的实现
             self._custom_train_operations(epoch)
@@ -176,11 +177,12 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                     # 记录学习率
                     for i, param_group in enumerate(self.optimizer.param_groups):
                         summary_writer.add_scalar(f'lr/group_{i}', param_group['lr'], global_step)
-                    if dev_data_loader:
+                    if dev_data_loader and self.args.local_rank in [-1, 0]:
                         UAS, LAS = self.dev(dev_data_loader, dev_CoNLLU_file)
                         summary_writer.add_scalar('metrics/uas', UAS, global_step)
                         summary_writer.add_scalar('metrics/las', LAS, global_step)
-                        if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
+                        if best_result.is_new_record(LAS=LAS, UAS=UAS,
+                                                     global_step=global_step) and self.args.local_rank in [-1, 0]:
                             self.logger.info(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             self.logger.info('\n' + str(best_result))
                             # 保存最优模型：
@@ -198,11 +200,13 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 break
             # print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
             summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
-        with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
-            f.write(str(best_result) + '\n')
+        if self.args.local_rank in [-1, 0]:
+            with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
+                f.write(str(best_result) + '\n')
         self.logger.info("\n## BEST RESULT in Training ##")
         self.logger.info('\n' + str(best_result))
-        summary_writer.close()
+        if self.args.local_rank in [-1, 0]:
+            summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):
         assert isinstance(dev_CoNLLU_file, CoNLLFile)
@@ -222,7 +226,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 with torch.no_grad():
                     _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None,
                                                                    word_mask,
-                                                                   label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
+                                                                   label_loss_ratio=self.model.label_loss_ratio if not self.args.data_parallel else self.model.module.label_loss_ratio,
                                                                    sentence_lengths=sent_lens,
                                                                    calc_loss=False, update=False, calc_prediction=True)
             except Exception as e:
@@ -247,7 +251,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             unlabeled_scores, labeled_scores = self.model(inputs)
             with torch.no_grad():
                 _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None, word_mask,
-                                                               label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
+                                                               label_loss_ratio=self.model.label_loss_ratio if not self.args.data_paralle else self.model.module.label_loss_ratio,
                                                                sentence_lengths=sent_lens,
                                                                calc_loss=False, update=False, calc_prediction=True)
             predictions += batch_prediction

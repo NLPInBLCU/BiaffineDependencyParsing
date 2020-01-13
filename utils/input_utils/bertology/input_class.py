@@ -51,11 +51,11 @@ class CoNLLUProcessor(object):
     def get_examples(self, file_path, max_seq_length, training=False):
         """Gets a collection of `InputExample`s for the dev set."""
         CoNLLU_file, CoNLLU_data = load_conllu_file(file_path)
-        return self._create_bert_example(CoNLLU_data,
+        return self.create_bert_example(CoNLLU_data,
                                          'train' if training else 'dev',
-                                         max_seq_length,
-                                         training=training,
-                                         ), CoNLLU_file
+                                        max_seq_length,
+                                        training=training,
+                                        ), CoNLLU_file
 
     def _get_words_start_end_pos(self, words_list, max_seq_length):
         s = []
@@ -93,7 +93,7 @@ class CoNLLUProcessor(object):
             e.append(sum_len - 1) if sum_len - 1 < max_seq_length else e.append(max_seq_length - 1)
         return s, e
 
-    def _create_bert_example(self, CoNLLU_data, set_type, max_seq_length, training=False):
+    def create_bert_example(self, CoNLLU_data, set_type, max_seq_length, training=False):
         examples = []
         # print(CoNLLU_data)
         for i, sent in enumerate(CoNLLU_data):

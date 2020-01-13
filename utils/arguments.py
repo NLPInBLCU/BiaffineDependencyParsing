@@ -34,6 +34,16 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_file', required=True)
     parser.add_argument('--run', choices=['train', 'dev', 'inference'], default='train')
+    """
+    How to set `local_rank` argument?
+    Ref:https://github.com/huggingface/transformers/issues/1651
+        The easiest way is to use the torch launch script. 
+        It will automatically set the local rank correctly. 
+        It would look something like this:
+            `python -m torch.distributed.launch --nproc_per_node 8 run_squad.py <your arguments>`
+    """
+    parser.add_argument("--local_rank", type=int, default=-1,
+                        help="For distributed training: local_rank, torch.distributed.launch 启动器会自动赋值")
     # 以下参数仅在dev或者inference时需要：
     parser.add_argument('--model_path', default=None, help='预先训练好的模型路径（文件夹）')
     parser.add_argument('--input', default=None, help='输入的CONLL-U文件，用来dev或者inference')

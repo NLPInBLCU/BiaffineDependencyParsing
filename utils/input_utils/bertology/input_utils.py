@@ -5,6 +5,7 @@ import pathlib
 import torch
 from utils.input_utils.bertology.input_class import *
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
+from torch.utils.data.distributed import DistributedSampler
 from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
 from utils.input_utils.custom_dataset import ConcatTensorRandomDataset
 from utils.logger import get_logger
@@ -179,30 +180,50 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
 
 
 def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, training=False):
+    if args.local_rank not in [-1, 0] and training:
+        torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
+    logger = get_logger(args.log_name)
     word_vocab = tokenizer.vocab if args.encoder_type == 'bertology' else None
     processor = CoNLLUProcessor(args, graph_vocab, word_vocab)
 
     label_list = graph_vocab.get_labels()
-    examples, CoNLLU_file = processor.get_examples(conllu_file_path, args.max_seq_len, training=training)
-    features = convert_examples_to_features(examples, label_list, args.max_seq_len, tokenizer,
-                                            cls_token_at_end=bool(args.encoder_type in ['xlnet']),
-                                            # xlnet has a cls token at the end
-                                            cls_token=tokenizer.cls_token,
-                                            cls_token_segment_id=2 if args.encoder_type in ['xlnet'] else 0,
-                                            sep_token=tokenizer.sep_token,
-                                            sep_token_extra=bool(args.encoder_type in ['roberta']),
-                                            # roberta uses an extra separator b/w pairs of sentences,
-                                            # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-                                            pad_on_left=bool(args.encoder_type in ['xlnet']),
-                                            # pad on the left for xlnet
-                                            pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
-                                            pad_token_segment_id=4 if args.encoder_type in ['xlnet'] else 0,
-                                            skip_too_long_input=args.skip_too_long_input,
-                                            )
+    _cwd, _file_name = pathlib.Path(conllu_file_path).cwd(), pathlib.Path(conllu_file_path).name
+    cached_features_file = _cwd / (
+        f'cached_{_file_name}_{"train" if training else "dev"}_{args.config_file}_{args.encoder_type}')
+    if cached_features_file.is_file() and args.use_cache:
+        logger.info("Loading features from cached file %s", str(cached_features_file))
+        conllu_file, features = torch.load(str(cached_features_file))
+    else:
+        conllu_file, conllu_data = load_conllu_file(conllu_file_path)
+        examples = processor.create_bert_example(conllu_data,
+                                                 'train' if training else 'dev',
+                                                 args.max_seq_length,
+                                                 training=training,
+                                                 )
+        features = convert_examples_to_features(examples, label_list, args.max_seq_len, tokenizer,
+                                                cls_token_at_end=bool(args.encoder_type in ['xlnet']),
+                                                # xlnet has a cls token at the end
+                                                cls_token=tokenizer.cls_token,
+                                                cls_token_segment_id=2 if args.encoder_type in ['xlnet'] else 0,
+                                                sep_token=tokenizer.sep_token,
+                                                sep_token_extra=bool(args.encoder_type in ['roberta']),
+                                                # roberta uses an extra separator b/w pairs of sentences,
+                                                # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
+                                                pad_on_left=bool(args.encoder_type in ['xlnet']),
+                                                # pad on the left for xlnet
+                                                pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
+                                                pad_token_segment_id=4 if args.encoder_type in ['xlnet'] else 0,
+                                                skip_too_long_input=args.skip_too_long_input,
+                                                )
+        if args.local_rank in [-1, 0] and args.use_cache:
+            logger.info("Saving features into cached file %s", str(cached_features_file))
+            torch.save((conllu_file, features), str(cached_features_file))
+    if args.local_rank == 0 and training:
+        torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
     # Convert to Tensors and build dataset
     data_set = feature_to_dataset(features)
 
-    return data_set, CoNLLU_file
+    return data_set, conllu_file
 
 
 def feature_to_dataset(features):
@@ -217,12 +238,13 @@ def feature_to_dataset(features):
     return dataset
 
 
-def get_data_loader(dataset, batch_size, evaluation=False, custom_dataset=False, num_worker=6):
+def get_data_loader(dataset, batch_size, evaluation=False, custom_dataset=False, num_worker=6, local_rank=-1):
     if evaluation:
         sampler = SequentialSampler(dataset)
     else:
         if not custom_dataset:
-            sampler = RandomSampler(dataset)
+            # 使用 DistributedSampler 对数据集进行划分
+            sampler = RandomSampler(dataset) if local_rank == -1 else DistributedSampler(dataset)
         else:
             sampler = None
     data_loader = DataLoader(dataset, sampler=sampler, batch_size=batch_size, num_workers=num_worker)
@@ -237,13 +259,21 @@ def load_bert_tokenizer(model_path, model_type, do_lower_case=True):
 
 
 def load_bertology_input(args):
+    # Make sure only the first process in distributed training process the dataset, and the others will use the cache
+    if args.local_rank not in [-1, 0] and args.run_mode == 'train':
+        torch.distributed.barrier()
     logger = get_logger(args.log_name)
     logger.info(f'data loader worker num: {args.loader_worker_num}')
     assert (pathlib.Path(args.saved_model_path) / 'vocab.txt').exists()
+    # Load pretrained model and tokenizer
+    if args.local_rank not in [-1, 0]:
+        torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
     tokenizer = load_bert_tokenizer(args.saved_model_path, args.bertology_type)
     vocab = GraphVocab(args.graph_vocab_file)
-    if args.run_mode == 'train':
+    if args.run_mode == 'train' and args.local_rank in [-1, 0]:
         tokenizer.save_pretrained(args.output_model_dir)
+    if args.local_rank == 0:
+        torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
     if args.run_mode in ['dev', 'inference']:
         # training 影响 Input Mask
         dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_path, vocab, tokenizer, training=False)
