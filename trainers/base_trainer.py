@@ -144,7 +144,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
         self.model.zero_grad()
         set_seed(self.args)  # Added here for reproductibility (even between python 2 and 3)
         train_stop = False
-        if self.args.local_rank in [-1, 0]:
+        if self.args.local_rank in [-1, 0] and not self.args.no_output:
             summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
         for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
@@ -174,24 +174,27 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                     epoch_ave_loss += loss
 
                 if global_step % self.args.eval_interval == 0 and self.args.local_rank in [-1, 0]:
-                    summary_writer.add_scalar('loss/train', loss, global_step)
-                    # 记录学习率
-                    for i, param_group in enumerate(self.optimizer.param_groups):
-                        summary_writer.add_scalar(f'lr/group_{i}', param_group['lr'], global_step)
+                    if not self.args.no_output:
+                        summary_writer.add_scalar('loss/train', loss, global_step)
+                        # 记录学习率
+                        for i, param_group in enumerate(self.optimizer.param_groups):
+                            summary_writer.add_scalar(f'lr/group_{i}', param_group['lr'], global_step)
                     if dev_data_loader and self.args.local_rank in [-1, 0]:
                         UAS, LAS = self.dev(dev_data_loader, dev_CoNLLU_file)
-                        summary_writer.add_scalar('metrics/uas', UAS, global_step)
-                        summary_writer.add_scalar('metrics/las', LAS, global_step)
+                        if not self.args.no_output:
+                            summary_writer.add_scalar('metrics/uas', UAS, global_step)
+                            summary_writer.add_scalar('metrics/las', LAS, global_step)
                         if best_result.is_new_record(LAS=LAS, UAS=UAS,
                                                      global_step=global_step) and self.args.local_rank in [-1, 0]:
                             self.logger.info(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             self.logger.info('\n' + str(best_result))
                             # 保存最优模型：
-                            if hasattr(self.model, 'module'):
-                                # 多卡,torch.nn.DataParallel封装model
-                                self.model.module.save_pretrained(self.args.output_model_dir)
-                            else:
-                                self.model.save_pretrained(self.args.output_model_dir)
+                            if not self.args.no_output:
+                                if hasattr(self.model, 'module'):
+                                    # 多卡,torch.nn.DataParallel封装model
+                                    self.model.module.save_pretrained(self.args.output_model_dir)
+                                else:
+                                    self.model.save_pretrained(self.args.output_model_dir)
 
                 if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
                     self.logger.info(f'\n## Early stop in step:{global_step} ##')
@@ -200,9 +203,9 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             if train_stop:
                 break
             # print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
-            if self.args.local_rank in [-1, 0]:
+            if self.args.local_rank in [-1, 0] and not self.args.no_output:
                 summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
-        if self.args.local_rank in [-1, 0]:
+        if self.args.local_rank in [-1, 0] and not self.args.no_output:
             with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
                 f.write(str(best_result) + '\n')
             self.logger.info("\n## BEST RESULT in Training ##")
@@ -214,7 +217,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
         if input_conllu_path is None:
             input_conllu_path = os.path.join(self.args.data_dir, self.args.dev_file)
         if output_conllu_path is None:
-            output_conllu_path = self.args.dev_output_path
+            output_conllu_path = self.args.dev_output_path if not self.args.no_output else None
         dev_data_loader = tqdm(dev_data_loader, desc='Evaluation')
         predictions = []
         for step, batch in enumerate(dev_data_loader):
@@ -238,7 +241,8 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             # batch_sent_lens += sent_lens
 
         dev_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
-        dev_CoNLLU_file.write_conll(output_conllu_path)
+        if output_conllu_path:
+            dev_CoNLLU_file.write_conll(output_conllu_path)
         UAS, LAS = sdp_scorer.score(output_conllu_path, input_conllu_path)
         return UAS, LAS
 

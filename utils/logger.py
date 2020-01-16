@@ -13,7 +13,9 @@
 import logging
 
 
-def init_logger(logger_name, log_file, is_debug=False):
+def init_logger(logger_name, log_file=None, is_debug=False, only_console=False):
+    if not only_console:
+        assert log_file
     logger = logging.getLogger(logger_name)
     if is_debug:
         logger.setLevel(logging.DEBUG)
@@ -34,7 +36,8 @@ def init_logger(logger_name, log_file, is_debug=False):
 
     # add
     logger.addHandler(c_handler)
-    logger.addHandler(f_handler)
+    if not only_console:
+        logger.addHandler(f_handler)
     logger.info('===================== NEW LOGGER =========================')
     return logger
 

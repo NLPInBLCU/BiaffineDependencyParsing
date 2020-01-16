@@ -48,7 +48,8 @@ def parse_args():
     parser.add_argument('--model_path', default=None, help='预先训练好的模型路径（文件夹）')
     parser.add_argument('--input', default=None, help='输入的CONLL-U文件，用来dev或者inference')
     parser.add_argument('--output', default=None, help='dev或者inference的输出文件')
-    parser.add_argument('--no_cuda', action='store_true', default=False, help='')
+    parser.add_argument('--no_cuda', action='store_true', default=False, help='不使用cuda加速，仅使用cpu')
+    parser.add_argument('--no_output', action='store_true', default=False, help='不输出文件，用于调试')
     args = parser.parse_args()
     if args.run in ['dev', 'inference']:
         assert args.model_path and args.input and args.output
@@ -69,6 +70,7 @@ def parse_args():
     args_dict['cuda'] = not args.no_cuda
     args_dict['cpu'] = args.no_cuda
     args_dict['local_rank'] = args.local_rank
+    args_dict['no_output'] = args.no_output
     if args.run in ['dev', 'inference']:
         # 覆盖模型路径
         args_dict['saved_model_path'] = args.model_path

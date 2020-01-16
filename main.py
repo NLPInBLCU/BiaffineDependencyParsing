@@ -81,6 +81,9 @@ def config_for_multi_gpu(args):
 
 def make_output_dir(args):
     assert args.run_mode == 'train', '仅在train模式下保存各种输出文件'
+    if args.no_output:
+        init_logger(args.log_name, only_console=True)
+        return
     output_dir = pathlib.Path(args.output_dir)
     assert output_dir.is_dir()
     time_str = datetime.now().strftime('_%Y-%m-%d-%H-%M-%S')
