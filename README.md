@@ -16,6 +16,9 @@ Various Encoder Layers (~~vanilla LSTM/Highway Droput LSTM/Transformer/~~BERTolo
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py -c config_files/bert_biaffine.yaml
 ```
 ### torch.distributed 分布式训练
+
+[distributedDataParallel VS dataParallel](parallelTrain.md)
+
 ```shell script
 CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 main.py -c config_files/bert_biaffine.yaml
 ```
