@@ -11,6 +11,7 @@
 -------------------------------------------------
 """
 import copy
+import logging
 
 import torch
 import pathlib
@@ -20,7 +21,7 @@ from datetime import datetime
 import yaml
 
 from utils.arguments import parse_args
-from trainers.bertology_trainer import BERTologyBiaffineTrainer
+from trainers.bertology_trainer import BERTologyBaseTrainer
 from models.biaffine_model import BiaffineDependencyModel
 from utils.input_utils.bertology.input_utils import load_bertology_input
 from utils.seed import set_seed
@@ -29,34 +30,51 @@ from utils.logger import init_logger, get_logger
 
 
 def load_trainer(args):
-    logger=get_logger(args.log_name)
+    logger = get_logger(args.log_name)
+
     if args.run_mode == 'train':
         # 默认train模式下是基于原始BERT预训练模型的参数开始的
         model = BiaffineDependencyModel.from_pretrained(args, initialize_from_bertology=True)
     else:
         model = BiaffineDependencyModel.from_pretrained(args, initialize_from_bertology=False)
+
     model.to(args.device)
 
     # multi-gpu training (should be after apex fp16 initialization)
-    if args.n_gpu > 1:
+    if args.n_gpu > 1 and args.local_rank == -1:
+        # 使用 DataParallel 多卡并行计算
+        # 值得注意的是，模型和数据都需要先 load 进 GPU 中，
+        # DataParallel 的 module 才能对其进行处理，否则会报错
         model = torch.nn.DataParallel(model)
         logger.info(f'Parallel Running, GPU num : {args.n_gpu}')
-        args.parallel_train = True
-    else:
-        args.parallel_train = False
+    # Distributed training (should be after apex fp16 initialization)
+    if args.local_rank != -1:
+        # 使用 DistributedDataParallel 包装模型，
+        # 它能帮助我们为不同 GPU 上求得的梯度进行 all reduce（即汇总不同 GPU 计算所得的梯度，并同步计算结果）
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[args.local_rank], output_device=args.local_rank,
+            # find_unused_parameters=True,
+        )
+
     if args.encoder_type == 'bertology':
-        trainer = BERTologyBiaffineTrainer(args, model)
+        trainer = BERTologyBaseTrainer(args, model)
     else:
         raise ValueError('Encoder Type not supported temporarily')
     return trainer
 
 
 def config_for_multi_gpu(args):
-    args.device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
-    if args.cuda:
+    # Setup CUDA, GPU & distributed training
+    if args.local_rank == -1 or args.cpu:
+        args.device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
         args.n_gpu = torch.cuda.device_count()
-    else:
-        args.n_gpu = 0
+    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+        torch.cuda.set_device(args.local_rank)
+        args.device = torch.device("cuda", args.local_rank)
+        # 使用 init_process_group 设置GPU 之间通信使用的后端和端口
+        torch.distributed.init_process_group(backend="nccl")
+        # # 分布式训练时，n_gpu设置为1
+        args.n_gpu = 1
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
 
@@ -103,8 +121,6 @@ def save_config_to_yaml(_config):
 def train(args):
     logger = get_logger(args.log_name)
     assert args.run_mode == 'train'
-    # 创建输出文件夹，保存运行结果，配置文件，模型参数
-    make_output_dir(args)
 
     with Timer('load input'):
         # 目前仅仅支持BERTology形式的输入
@@ -126,6 +142,8 @@ def train(args):
         logger.info(f'do not use early stop, training will last {args.max_train_epochs} epochs')
     with Timer('load trainer'):
         trainer = load_trainer(args)
+    # if args.local_rank == 0:
+    #     torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
     save_config_to_yaml(args)
     with Timer('Train'):
         trainer.train(train_data_loader, dev_data_loader, dev_conllu)
@@ -163,10 +181,13 @@ def main():
     with Timer('parse args'):
         args = parse_args()
     # 添加多卡运行下的配置参数
-    # BERT训练须在多卡下运行，单卡非常慢
+    # Setup CUDA, GPU & distributed training
     config_for_multi_gpu(args)
     # set_seed 必须在设置n_gpu之后
     set_seed(args)
+    # 创建输出文件夹，保存运行结果，配置文件，模型参数
+    if args.run_mode == 'train' and args.local_rank in [-1, 0]:
+        make_output_dir(args)
 
     if args.run_mode == 'train':
         train(args)

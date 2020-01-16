@@ -256,7 +256,7 @@ class CoNLLFile(object):
         return
 
 
-def load_conllu_file(filename, evaluation=False):
+def load_conllu_file(filename):
     """
     Conllu file 格式:
         单词序号\t单词\t单词\t词性\t词性\t_(置空)\t父节点序号\t依存弧标签\tdeps(父节点序号:依存弧标签|...)

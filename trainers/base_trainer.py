@@ -4,7 +4,7 @@ import os
 import re
 import torch
 import torch.nn as nn
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from abc import ABCMeta, abstractmethod
 
 from utils.information import debug_print
@@ -24,7 +24,7 @@ except ImportError:
     from tensorboardX import SummaryWriter
 
 
-class BiaffineDependencyTrainer(metaclass=ABCMeta):
+class BaseDependencyTrainer(metaclass=ABCMeta):
     def __init__(self, args, model):
         self.model = model
         self.optimizer = self.optim_scheduler = None
@@ -55,7 +55,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         pass
 
     def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_pad_mask,
-                            label_loss_ratio=None, sentence_lengths=None,
+                            label_loss_ratio=0.5, sentence_lengths=None,
                             calc_loss=True, update=True, calc_prediction=False):
         """
             针对一个batch输入：计算loss，反向传播，计算预测结果
@@ -95,13 +95,30 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
             if update:
+                """
+                    Ref:https://discuss.pytorch.org/t/model-zero-grad-or-optimizer-zero-grad/28426/5
+                    Dmitry A. Konovalov:
+                        model.zero_grad() and optimizer.zero_grad() are the same IF all your model parameters 
+                        are in that optimizer. 
+                        I found it is safer to call model.zero_grad() to make sure all grads are zero, 
+                        e.g. if you have two or more optimizers for one model.
+                    Ref:https://discuss.pytorch.org/t/zero-grad-optimizer-or-net/1887/9
+                    ptrblck：
+                         if you pass all parameters of your model to the optimizer, both calls will be equal.
+                         model.zero_grad() would clear all parameters of the model, 
+                         while the optimizerX.zero_grad() call will just clean 
+                         the gradients of the parameters that were passed to it.
+                """
+                # loss.backward() **之前** 清空模型梯度
+                self.model.zero_grad()
+                # 参看上述注释，这里只需要model.zero_grad()
+                # self.optimizer.zero_grad()
                 loss.backward()
                 if self.args.max_grad_norm > 0:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
                 self.optimizer.step()
                 if self.optim_scheduler:
                     self.optim_scheduler.step()  # Update learning rate schedule
-                self.model.zero_grad()
             loss = loss.detach().cpu().item()
         else:
             loss = None
@@ -127,10 +144,12 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         self.model.zero_grad()
         set_seed(self.args)  # Added here for reproductibility (even between python 2 and 3)
         train_stop = False
-        summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
+        if self.args.local_rank in [-1, 0]:
+            summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
         for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
-            train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}')
+            train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}',
+                                     disable=self.args.local_rank not in [-1, 0])
             # 某些模型在训练时可能需要一些定制化的操作，默认什么都不做
             # 具体参考子类中_custom_train_operations的实现
             self._custom_train_operations(epoch)
@@ -148,22 +167,23 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                 # Calc loss and update:
                 loss, _ = self._update_and_predict(unlabeled_scores, labeled_scores, unlabeled_target, labeled_target,
                                                    word_pad_mask,
-                                                   label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
+                                                   # label_loss_ratio=self.model.module.label_loss_ratio if hasattr(self.model,'module') else self.model.label_loss_ratio,
                                                    calc_loss=True, update=True, calc_prediction=False)
                 global_step += 1
                 if loss is not None:
                     epoch_ave_loss += loss
 
-                if global_step % self.args.eval_interval == 0:
+                if global_step % self.args.eval_interval == 0 and self.args.local_rank in [-1, 0]:
                     summary_writer.add_scalar('loss/train', loss, global_step)
                     # 记录学习率
                     for i, param_group in enumerate(self.optimizer.param_groups):
                         summary_writer.add_scalar(f'lr/group_{i}', param_group['lr'], global_step)
-                    if dev_data_loader:
+                    if dev_data_loader and self.args.local_rank in [-1, 0]:
                         UAS, LAS = self.dev(dev_data_loader, dev_CoNLLU_file)
                         summary_writer.add_scalar('metrics/uas', UAS, global_step)
                         summary_writer.add_scalar('metrics/las', LAS, global_step)
-                        if best_result.is_new_record(LAS=LAS, UAS=UAS, global_step=global_step):
+                        if best_result.is_new_record(LAS=LAS, UAS=UAS,
+                                                     global_step=global_step) and self.args.local_rank in [-1, 0]:
                             self.logger.info(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             self.logger.info('\n' + str(best_result))
                             # 保存最优模型：
@@ -180,12 +200,14 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
             if train_stop:
                 break
             # print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
-            summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
-        with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
-            f.write(str(best_result) + '\n')
-        self.logger.info("\n## BEST RESULT in Training ##")
-        self.logger.info('\n' + str(best_result))
-        summary_writer.close()
+            if self.args.local_rank in [-1, 0]:
+                summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
+        if self.args.local_rank in [-1, 0]:
+            with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
+                f.write(str(best_result) + '\n')
+            self.logger.info("\n## BEST RESULT in Training ##")
+            self.logger.info('\n' + str(best_result))
+            summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):
         assert isinstance(dev_CoNLLU_file, CoNLLFile)
@@ -205,7 +227,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
                 with torch.no_grad():
                     _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None,
                                                                    word_mask,
-                                                                   label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
+                                                                   # label_loss_ratio=self.model.module.label_loss_ratio if hasattr(self.model,'module') else self.model.label_loss_ratio,
                                                                    sentence_lengths=sent_lens,
                                                                    calc_loss=False, update=False, calc_prediction=True)
             except Exception as e:
@@ -230,7 +252,7 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
             unlabeled_scores, labeled_scores = self.model(inputs)
             with torch.no_grad():
                 _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None, word_mask,
-                                                               label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
+                                                               # label_loss_ratio=self.model.label_loss_ratio if not self.args.data_paralle else self.model.module.label_loss_ratio,
                                                                sentence_lengths=sent_lens,
                                                                calc_loss=False, update=False, calc_prediction=True)
             predictions += batch_prediction
@@ -239,12 +261,12 @@ class BiaffineDependencyTrainer(metaclass=ABCMeta):
         return predictions
 
 
-class TransformerBiaffineTrainer(BiaffineDependencyTrainer):
+class TransformerBaseTrainer(BaseDependencyTrainer):
     def _unpack_batch(self, args, batch):
         pass
 
 
-class CharRNNBiaffineTrainer(BiaffineDependencyTrainer):
+class CharRNNBaseTrainer(BaseDependencyTrainer):
     pass
 
 
