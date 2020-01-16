@@ -9,7 +9,7 @@ run:
   seed: 1234
   #只需要指定最大的epoch数量，不需要指定最大steps
   #可能的选择：80,150
-  max_train_epochs: 80
+  max_train_epochs: 3
   eval_interval: 100
   early_stop: false
   early_stop_epochs: 6
@@ -27,7 +27,7 @@ data_set:
 merge_train_data:
   # 幂指数加权采样：在多个不同领域数据之间如何合理地采样
   # 是够采用幂指数平滑采样: utils.input_utils.custom_dataset.ConcatTensorRandomDataset
-  merge_training: true
+  merge_training: false
   train_text_file: 'train/sdp_text_train.conllu'
   train_news_file: 'train/sdp_news_train.conllu'
   merge_train_mode: 'exp'  # exp or prob
@@ -68,13 +68,13 @@ BERTology:
 BERTologyInputMask:
   # 是否使用InputMask
   # 类似word dropout
-  input_mask: true
+  input_mask: false
   input_mask_prob: 0.1
   input_mask_granularity: 'word' # char or word
 BERTologyFreeze:
   # 是否冻结BERT的参数
   # 冻结底层参数可以减小显存占用，加快训练
-  freeze: true # freeze的控制开关，如果为false则无论下述参数为何都不使用freeze
+  freeze: false # freeze的控制开关，如果为false则无论下述参数为何都不使用freeze
   freeze_bertology_layers: 3 # -1:frezze BERT embedding 层; 0：只freeze最底层; 3：freeze 0,1,2,3层; 11: freeze Base model所有层
   freeze_epochs: 'all' # all:一直freeze; first:只在首个epoch freeze:
 decoder:
@@ -84,7 +84,7 @@ decoder:
   direct_biaffine: false
 update:
   # 是否用可学习的loss—ratio（用来控制两种loss的组合）
-  learned_loss_ratio: true
+  learned_loss_ratio: false
   label_loss_ratio: 0.5
   # 是够缩放loss（有用吗？）
   scale_loss: false
@@ -100,12 +100,13 @@ update:
   eps: 1.0e-12
   weight_decay: 3.0e-9
   learning_rate: 5.0e-5  # 学习率
-  different_lr: true  # 如果为True，则使用下面的两个学习率
-  bertology_lr: 5.0e-5
-  other_lr: 1.0e-3
   # bertDistill:1.0e-6;
   adam_epsilon: 1.0e-8
   # bertDistill:0.05;
   warmup_prop: 0.1
   # 是够按照单词数量平均一个batch的loss
   average_loss_by_words_num: true
+different_lr:
+  different_lr: false  # 如果为True，则使用下面的两个学习率
+  bertology_lr: 5.0e-5
+  other_lr: 1.0e-3

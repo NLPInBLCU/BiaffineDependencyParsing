@@ -55,7 +55,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
         pass
 
     def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_pad_mask,
-                            label_loss_ratio=None, sentence_lengths=None,
+                            label_loss_ratio=0.5, sentence_lengths=None,
                             calc_loss=True, update=True, calc_prediction=False):
         """
             针对一个batch输入：计算loss，反向传播，计算预测结果
@@ -148,7 +148,8 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             summary_writer = SummaryWriter(log_dir=self.args.summary_dir)
         for epoch in range(1, self.args.max_train_epochs + 1):
             epoch_ave_loss = 0
-            train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}',disable=self.args.local_rank not in [-1, 0])
+            train_data_loader = tqdm(train_data_loader, desc=f'Training epoch {epoch}',
+                                     disable=self.args.local_rank not in [-1, 0])
             # 某些模型在训练时可能需要一些定制化的操作，默认什么都不做
             # 具体参考子类中_custom_train_operations的实现
             self._custom_train_operations(epoch)
@@ -166,13 +167,13 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 # Calc loss and update:
                 loss, _ = self._update_and_predict(unlabeled_scores, labeled_scores, unlabeled_target, labeled_target,
                                                    word_pad_mask,
-                                                   label_loss_ratio=self.model.label_loss_ratio if not self.args.parallel_train else self.model.module.label_loss_ratio,
+                                                   # label_loss_ratio=self.model.module.label_loss_ratio if hasattr(self.model,'module') else self.model.label_loss_ratio,
                                                    calc_loss=True, update=True, calc_prediction=False)
                 global_step += 1
                 if loss is not None:
                     epoch_ave_loss += loss
 
-                if global_step % self.args.eval_interval == 0:
+                if global_step % self.args.eval_interval == 0 and self.args.local_rank in [-1, 0]:
                     summary_writer.add_scalar('loss/train', loss, global_step)
                     # 记录学习率
                     for i, param_group in enumerate(self.optimizer.param_groups):
@@ -199,13 +200,13 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             if train_stop:
                 break
             # print(f'\n- Epoch {epoch} average loss : {epoch_ave_loss / len(train_data_loader)}')
-            summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
+            if self.args.local_rank in [-1, 0]:
+                summary_writer.add_scalar('epoch_loss', epoch_ave_loss / len(train_data_loader), epoch)
         if self.args.local_rank in [-1, 0]:
             with open(self.args.dev_result_path, 'w', encoding='utf-8')as f:
                 f.write(str(best_result) + '\n')
-        self.logger.info("\n## BEST RESULT in Training ##")
-        self.logger.info('\n' + str(best_result))
-        if self.args.local_rank in [-1, 0]:
+            self.logger.info("\n## BEST RESULT in Training ##")
+            self.logger.info('\n' + str(best_result))
             summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):
@@ -226,7 +227,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 with torch.no_grad():
                     _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None,
                                                                    word_mask,
-                                                                   label_loss_ratio=self.model.label_loss_ratio if not self.args.data_parallel else self.model.module.label_loss_ratio,
+                                                                   # label_loss_ratio=self.model.module.label_loss_ratio if hasattr(self.model,'module') else self.model.label_loss_ratio,
                                                                    sentence_lengths=sent_lens,
                                                                    calc_loss=False, update=False, calc_prediction=True)
             except Exception as e:
@@ -251,7 +252,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             unlabeled_scores, labeled_scores = self.model(inputs)
             with torch.no_grad():
                 _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None, word_mask,
-                                                               label_loss_ratio=self.model.label_loss_ratio if not self.args.data_paralle else self.model.module.label_loss_ratio,
+                                                               # label_loss_ratio=self.model.label_loss_ratio if not self.args.data_paralle else self.model.module.label_loss_ratio,
                                                                sentence_lengths=sent_lens,
                                                                calc_loss=False, update=False, calc_prediction=True)
             predictions += batch_prediction

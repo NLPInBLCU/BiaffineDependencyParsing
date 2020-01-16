@@ -180,8 +180,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
 
 
 def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, training=False):
-    if args.local_rank not in [-1, 0] and training:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
     logger = get_logger(args.log_name)
     word_vocab = tokenizer.vocab if args.encoder_type == 'bertology' else None
     processor = CoNLLUProcessor(args, graph_vocab, word_vocab)
@@ -189,7 +187,7 @@ def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, trai
     label_list = graph_vocab.get_labels()
     _cwd, _file_name = pathlib.Path(conllu_file_path).cwd(), pathlib.Path(conllu_file_path).name
     cached_features_file = _cwd / (
-        f'cached_{_file_name}_{"train" if training else "dev"}_{args.config_file}_{args.encoder_type}')
+        f'cached_{_file_name}_{"train" if training else "dev"}_{pathlib.Path(args.config_file).name}_{args.encoder_type}')
     if cached_features_file.is_file() and args.use_cache:
         logger.info("Loading features from cached file %s", str(cached_features_file))
         conllu_file, features = torch.load(str(cached_features_file))
@@ -197,7 +195,7 @@ def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, trai
         conllu_file, conllu_data = load_conllu_file(conllu_file_path)
         examples = processor.create_bert_example(conllu_data,
                                                  'train' if training else 'dev',
-                                                 args.max_seq_length,
+                                                 args.max_seq_len,
                                                  training=training,
                                                  )
         features = convert_examples_to_features(examples, label_list, args.max_seq_len, tokenizer,
@@ -218,11 +216,8 @@ def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, trai
         if args.local_rank in [-1, 0] and args.use_cache:
             logger.info("Saving features into cached file %s", str(cached_features_file))
             torch.save((conllu_file, features), str(cached_features_file))
-    if args.local_rank == 0 and training:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
     # Convert to Tensors and build dataset
     data_set = feature_to_dataset(features)
-
     return data_set, conllu_file
 
 
@@ -238,7 +233,8 @@ def feature_to_dataset(features):
     return dataset
 
 
-def get_data_loader(dataset, batch_size, evaluation=False, custom_dataset=False, num_worker=6, local_rank=-1):
+def get_data_loader(dataset, batch_size, evaluation=False,
+                    custom_dataset=False, num_worker=6, local_rank=-1):
     if evaluation:
         sampler = SequentialSampler(dataset)
     else:
@@ -247,6 +243,7 @@ def get_data_loader(dataset, batch_size, evaluation=False, custom_dataset=False,
             sampler = RandomSampler(dataset) if local_rank == -1 else DistributedSampler(dataset)
         else:
             sampler = None
+    print(f'get_data_loader: training:{not evaluation}; sampler:{sampler}')
     data_loader = DataLoader(dataset, sampler=sampler, batch_size=batch_size, num_workers=num_worker)
     return data_loader
 
@@ -260,20 +257,16 @@ def load_bert_tokenizer(model_path, model_type, do_lower_case=True):
 
 def load_bertology_input(args):
     # Make sure only the first process in distributed training process the dataset, and the others will use the cache
-    if args.local_rank not in [-1, 0] and args.run_mode == 'train':
-        torch.distributed.barrier()
+    # if args.local_rank not in [-1, 0] and args.run_mode == 'train':
+    #     torch.distributed.barrier()
     logger = get_logger(args.log_name)
     logger.info(f'data loader worker num: {args.loader_worker_num}')
     assert (pathlib.Path(args.saved_model_path) / 'vocab.txt').exists()
-    # Load pretrained model and tokenizer
-    if args.local_rank not in [-1, 0]:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
     tokenizer = load_bert_tokenizer(args.saved_model_path, args.bertology_type)
     vocab = GraphVocab(args.graph_vocab_file)
     if args.run_mode == 'train' and args.local_rank in [-1, 0]:
         tokenizer.save_pretrained(args.output_model_dir)
-    if args.local_rank == 0:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
+
     if args.run_mode in ['dev', 'inference']:
         # training 影响 Input Mask
         dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_path, vocab, tokenizer, training=False)
@@ -300,11 +293,18 @@ def load_bertology_input(args):
             # 此时无法产生正确的train_conllu_file，不过所幸训练时可以不用train_conllu_file（不过这样就无法计算train metrics了）
             train_conllu_file = None
 
-        train_data_loader = get_data_loader(train_dataset, batch_size=args.train_batch_size, evaluation=False,
-                                            custom_dataset=args.merge_training, num_worker=args.loader_worker_num)
+        train_data_loader = get_data_loader(train_dataset,
+                                            batch_size=args.train_batch_size,
+                                            evaluation=False,
+                                            custom_dataset=args.merge_training,
+                                            num_worker=args.loader_worker_num,
+                                            local_rank=args.local_rank)
 
-        dev_dataset, dev_conllu_file = load_and_cache_examples(args, os.path.join(args.data_dir, args.dev_file),
+        dev_dataset, dev_conllu_file = load_and_cache_examples(args,
+                                                               os.path.join(args.data_dir, args.dev_file),
                                                                vocab, tokenizer, training=False)
-        dev_data_loader = get_data_loader(dev_dataset, batch_size=args.eval_batch_size, evaluation=True,
+        dev_data_loader = get_data_loader(dev_dataset,
+                                          batch_size=args.eval_batch_size,
+                                          evaluation=True,
                                           num_worker=args.loader_worker_num)
         return train_data_loader, train_conllu_file, dev_data_loader, dev_conllu_file

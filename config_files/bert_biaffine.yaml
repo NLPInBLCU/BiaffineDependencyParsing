@@ -23,7 +23,7 @@ data_set:
   per_gpu_eval_batch_size: 20
   skip_too_long_input: true
   loader_worker_num: 10
-  use_cache: false
+  use_cache: true
 merge_train_data:
   # 幂指数加权采样：在多个不同领域数据之间如何合理地采样
   # 是够采用幂指数平滑采样: utils.input_utils.custom_dataset.ConcatTensorRandomDataset

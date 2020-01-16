@@ -6,6 +6,7 @@ import torch
 # from model_utils.optimization import *
 import pytorch_transformers.optimization as huggingfaceOptim  # 避免和torch.optim重名
 from utils.information import debug_print
+from utils.logger import get_logger
 
 
 def get_optimizer_old(name, parameters, lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):
@@ -79,6 +80,7 @@ def _get_bertology_different_lr_grouped_parameters(args, model):
 
 
 def get_optimizer(args, model):
+    logger = get_logger(args.log_name)
     args.warmup_steps = math.ceil(args.warmup_prop * args.max_train_steps)
     if args.optimizer == 'adamw-bertology':
         if args.different_lr:
@@ -89,7 +91,8 @@ def get_optimizer(args, model):
                                            betas=(args.beta1, args.beta2))
         scheduler = huggingfaceOptim.WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps,
                                                           t_total=args.max_train_steps)
-        debug_print('\n - Use Huggingface\'s AdamW Optimizer')
+        if args.local_rank in [-1, 0]:
+            logger.info('Use Huggingface\'s AdamW Optimizer')
     elif args.optimizer == 'adamw-torch':
         try:
             from torch.optim import AdamW

@@ -55,10 +55,10 @@ class BiaffineDependencyModel(BaseModel):
                                                        pairwise=True,
                                                        dropout=args.biaffine_dropout)
         # self.dropout = nn.Dropout(args.dropout)
-        if args.learned_loss_ratio:
-            self.label_loss_ratio = nn.Parameter(torch.Tensor([0.5]))
-        else:
-            self.label_loss_ratio = args.label_loss_ratio
+        # if args.learned_loss_ratio:
+        #     self.label_loss_ratio = nn.Parameter(torch.Tensor([0.5]))
+        # else:
+        #     self.label_loss_ratio = args.label_loss_ratio
 
     def forward(self, inputs):
         assert isinstance(inputs, dict)
