@@ -53,7 +53,7 @@ def load_trainer(args):
         # 它能帮助我们为不同 GPU 上求得的梯度进行 all reduce（即汇总不同 GPU 计算所得的梯度，并同步计算结果）
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[args.local_rank], output_device=args.local_rank,
-            # find_unused_parameters=True,
+            find_unused_parameters=True,
         )
 
     if args.encoder_type == 'bertology':
