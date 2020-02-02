@@ -194,7 +194,8 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                                                    # label_loss_ratio=self.model.module.label_loss_ratio if hasattr(self.model,'module') else self.model.label_loss_ratio,
                                                    calc_loss=True, update=True, calc_prediction=False,
                                                    pos_logits=pos_logits, pos_target=pos_target,
-                                                   summary_writer=summary_writer if self.args.local_rank in [-1, 0] else None,
+                                                   summary_writer=summary_writer if self.args.local_rank in [-1,
+                                                                                                             0] else None,
                                                    global_step=global_step)
                 global_step += 1
                 if loss is not None:
@@ -250,7 +251,18 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
         for step, batch in enumerate(dev_data_loader):
             self.model.eval()
             batch = tuple(t.to(self.args.device) for t in batch)
-            inputs, word_mask, sent_lens, dep_ids = self._unpack_batch(self.args, batch)
+            unpacked_batch = self._unpack_batch(self.args, batch)
+            """
+            unpacked_batch = {
+                    'inputs': inputs,
+                    'word_mask': word_mask,
+                    'sent_len': sent_len,
+                    'dep_ids': dep_ids,
+                    'pos_ids': pos_ids,
+                }
+            """
+            inputs, word_mask, sent_lens, dep_ids = unpacked_batch['inputs'], unpacked_batch['word_mask'], \
+                                                    unpacked_batch['sent_lens'], unpacked_batch['dep_ids']
             word_mask = torch.eq(word_mask, 0)
             unlabeled_scores, labeled_scores = self.model(inputs)
             try:
@@ -278,7 +290,18 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
         predictions = []
         for step, batch in enumerate(inference_data_loader):
             self.model.eval()
-            inputs, word_mask, sent_lens, _ = self._unpack_batch(self.args, batch)
+            unpacked_batch = self._unpack_batch(self.args, batch)
+            """
+            unpacked_batch = {
+                    'inputs': inputs,
+                    'word_mask': word_mask,
+                    'sent_len': sent_len,
+                    'dep_ids': dep_ids,
+                    'pos_ids': pos_ids,
+                }
+            """
+            inputs, word_mask, sent_lens, _ = unpacked_batch['inputs'], unpacked_batch['word_mask'], \
+                                                    unpacked_batch['sent_lens'], unpacked_batch['dep_ids']
             word_mask = torch.eq(word_mask, 0)
             unlabeled_scores, labeled_scores = self.model(inputs)
             with torch.no_grad():
