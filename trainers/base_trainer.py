@@ -264,7 +264,8 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             inputs, word_mask, sent_lens, dep_ids = unpacked_batch['inputs'], unpacked_batch['word_mask'], \
                                                     unpacked_batch['sent_len'], unpacked_batch['dep_ids']
             word_mask = torch.eq(word_mask, 0)
-            unlabeled_scores, labeled_scores = self.model(inputs)
+            model_output = self.model(inputs)
+            unlabeled_scores, labeled_scores = model_output['unlabeled_scores'], model_output['labeled_scores']
             try:
                 with torch.no_grad():
                     _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None,
@@ -303,7 +304,8 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             inputs, word_mask, sent_lens, _ = unpacked_batch['inputs'], unpacked_batch['word_mask'], \
                                                     unpacked_batch['sent_len'], unpacked_batch['dep_ids']
             word_mask = torch.eq(word_mask, 0)
-            unlabeled_scores, labeled_scores = self.model(inputs)
+            model_output = self.model(inputs)
+            unlabeled_scores, labeled_scores = model_output['unlabeled_scores'], model_output['labeled_scores']
             with torch.no_grad():
                 _, batch_prediction = self._update_and_predict(unlabeled_scores, labeled_scores, None, None, word_mask,
                                                                # label_loss_ratio=self.model.label_loss_ratio if not self.args.data_paralle else self.model.module.label_loss_ratio,
