@@ -220,8 +220,9 @@ def get_pos_tokenizer(new_pos_list, file_path, merge_train=False, conllu_data=No
     if conllu_data is not None:
         assert isinstance(conllu_data, CoNLLUData)
     assert isinstance(file_path, pathlib.Path)
-    if (new_pos_list and not merge_train) or \
-            (new_pos_list and merge_train and not (file_path / 'pos_list.json').exists()):
+    if conllu_data is not None and \
+            ((new_pos_list and not merge_train) or
+             (new_pos_list and merge_train and not (file_path / 'pos_list.json').exists())):
         pos_counter = Counter()
         for sent in conllu_data.sentences:
             for word in sent.words:
