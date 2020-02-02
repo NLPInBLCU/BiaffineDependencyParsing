@@ -262,7 +262,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 }
             """
             inputs, word_mask, sent_lens, dep_ids = unpacked_batch['inputs'], unpacked_batch['word_mask'], \
-                                                    unpacked_batch['sent_lens'], unpacked_batch['dep_ids']
+                                                    unpacked_batch['sent_len'], unpacked_batch['dep_ids']
             word_mask = torch.eq(word_mask, 0)
             unlabeled_scores, labeled_scores = self.model(inputs)
             try:
@@ -301,7 +301,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 }
             """
             inputs, word_mask, sent_lens, _ = unpacked_batch['inputs'], unpacked_batch['word_mask'], \
-                                                    unpacked_batch['sent_lens'], unpacked_batch['dep_ids']
+                                                    unpacked_batch['sent_len'], unpacked_batch['dep_ids']
             word_mask = torch.eq(word_mask, 0)
             unlabeled_scores, labeled_scores = self.model(inputs)
             with torch.no_grad():
