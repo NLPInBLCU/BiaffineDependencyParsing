@@ -217,7 +217,8 @@ class POSTokenizer(object):
 
 
 def get_pos_tokenizer(new_pos_list, file_path, merge_train=False, conllu_data=None):
-    assert isinstance(conllu_data, CoNLLUData)
+    if conllu_data is not None:
+        assert isinstance(conllu_data, CoNLLUData)
     assert isinstance(file_path, pathlib.Path)
     if (new_pos_list and not merge_train) or \
             (new_pos_list and merge_train and not (file_path / 'pos_list.json').exists()):
