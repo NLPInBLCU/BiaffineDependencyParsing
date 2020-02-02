@@ -90,8 +90,8 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             dep_label_loss = dep_label_loss_func(labeled_scores, labeled_target.view(-1))
 
             if self.args.use_pos:
-                assert pos_logits
-                assert pos_target
+                assert pos_logits is not None
+                assert pos_target is not None
                 pos_loss_func = nn.CrossEntropyLoss(ignore_index=self.args.pos_label_pad_idx)
                 pos_loss = pos_loss_func(pos_logits.view(-1, self.args.pos_label_num), pos_target.view(-1))
 

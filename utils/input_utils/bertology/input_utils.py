@@ -216,7 +216,7 @@ class POSTokenizer(object):
         return len(self.pos_list)
 
 
-def get_pos_tokenizer(conllu_data, new_pos_list, file_path, merge_train=False):
+def get_pos_tokenizer(new_pos_list, file_path, merge_train=False, conllu_data=None):
     assert isinstance(conllu_data, CoNLLUData)
     assert isinstance(file_path, pathlib.Path)
     if (new_pos_list and not merge_train) or \
@@ -251,10 +251,13 @@ def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, trai
     if cached_features_file.is_file() and args.use_cache:
         logger.info("Loading features from cached file %s", str(cached_features_file))
         conllu_file, features = torch.load(str(cached_features_file))
+        pos_tokenizer = get_pos_tokenizer(new_pos_list=training, file_path=cached_dir)
+        args.pos_label_pad_idx = pos_tokenizer.get_idx('<PAD>')
+        args.pos_label_num = pos_tokenizer.get_label_num()
     else:
         conllu_file, conllu_data = load_conllu_file(conllu_file_path)
         # 仅在training=True时，生成新的pos_list
-        pos_tokenizer = get_pos_tokenizer(conllu_data, new_pos_list=training, file_path=cached_dir)
+        pos_tokenizer = get_pos_tokenizer(new_pos_list=training, file_path=cached_dir, conllu_data=conllu_data)
         args.pos_label_pad_idx = pos_tokenizer.get_idx('<PAD>')
         args.pos_label_num = pos_tokenizer.get_label_num()
         examples = processor.create_bert_example(conllu_data,
