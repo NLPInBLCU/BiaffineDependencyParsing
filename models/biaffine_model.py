@@ -54,6 +54,9 @@ class BiaffineDependencyModel(BaseModel):
                                                        len(self.graph_vocab.get_labels()),
                                                        pairwise=True,
                                                        dropout=args.biaffine_dropout)
+        if args.use_pos:
+            # todo: support CRF
+            self.pos_classifier = nn.Linear(args.encoder_output_dim, args.pos_label_num)
         # self.dropout = nn.Dropout(args.dropout)
         # if args.learned_loss_ratio:
         #     self.label_loss_ratio = nn.Parameter(torch.Tensor([0.5]))
@@ -65,4 +68,12 @@ class BiaffineDependencyModel(BaseModel):
         encoder_output = self.encoder(**inputs)
         unlabeled_scores = self.unlabeled_biaffine(encoder_output, encoder_output).squeeze(3)
         labeled_scores = self.labeled_biaffine(encoder_output, encoder_output)
-        return unlabeled_scores, labeled_scores
+        if self.args.use_pos:
+            pos_logits = self.pos_classifier(encoder_output)
+        else:
+            pos_logits = None
+        return {
+            'unlabeled_scores': unlabeled_scores,
+            'labeled_scores': labeled_scores,
+            'pos_logits': pos_logits,
+        }

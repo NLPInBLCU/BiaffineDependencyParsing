@@ -8,3 +8,4 @@ numpy>=1.16.4
 torch>=1.2.0
 tensorboardX>=1.9
 PyYAML>=5.1.2
+git+https://github.com/kmkurn/pytorch-crf#egg=pytorch_crf

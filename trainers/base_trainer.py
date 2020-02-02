@@ -36,9 +36,13 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
     def _unpack_batch(self, args, batch):
         """
             拆分batch，得到encoder的输入和word mask，sentence length，以及dep ids
+            dataset = TensorDataset(all_input_ids, all_input_mask,
+                        all_segment_ids, all_start_pos,
+                        all_end_pos, all_dep_ids,
+                        all_pos_ids)
         :param args: 配置参数
         :param batch: 输入的单个batch,类型为TensorDataset(或者torchtext.dataset)，可用索引分别取值
-        :return:返回一个元祖，[1]是inputs，类型为字典；[2]是word mask；[3]是sentence length,python 列表；[4]是dep ids
+        :return:返回一个字典，[1]是inputs，类型为字典；[2]是word mask；[3]是sentence length,python 列表；[4]是dep ids
         """
         raise NotImplementedError('must implement in sub class')
 
@@ -56,7 +60,9 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
 
     def _update_and_predict(self, unlabeled_scores, labeled_scores, unlabeled_target, labeled_target, word_pad_mask,
                             label_loss_ratio=0.5, sentence_lengths=None,
-                            calc_loss=True, update=True, calc_prediction=False):
+                            calc_loss=True, update=True, calc_prediction=False,
+                            pos_logits=None, pos_target=None, pos_loss_ratio=1.0,
+                            summary_writer=None, global_step=None):
         """
             针对一个batch输入：计算loss，反向传播，计算预测结果
             :param word_pad_mask: 以word为单位，1为PAD，0为真实输入
@@ -83,7 +89,16 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             labeled_scores = labeled_scores.contiguous().view(-1, len(self.graph_vocab.get_labels()))
             dep_label_loss = dep_label_loss_func(labeled_scores, labeled_target.view(-1))
 
+            if self.args.use_pos:
+                assert pos_logits
+                assert pos_target
+                pos_loss_func = nn.CrossEntropyLoss(ignore_index=self.args.pos_label_pad_idx)
+                pos_loss = pos_loss_func(pos_logits.view(-1, self.args.pos_label_num), pos_target.view(-1))
+
             loss = 2 * ((1 - label_loss_ratio) * dep_arc_loss + label_loss_ratio * dep_label_loss)
+
+            if self.args.use_pos:
+                loss = loss + pos_loss_ratio * pos_loss
 
             if self.args.average_loss_by_words_num:
                 loss = loss / words_num
@@ -93,6 +108,12 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
 
             if self.args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
+
+            if summary_writer and global_step:
+                summary_writer.add_scalar('train_loss/dep_arc_loss', dep_arc_loss, global_step)
+                summary_writer.add_scalar('train_loss/dep_label_loss', dep_label_loss, global_step)
+                if self.args.use_pos:
+                    summary_writer.add_scalar('train_loss/pos_loss', pos_loss, global_step)
 
             if update:
                 """
@@ -158,24 +179,30 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 self.model.train()
                 # debug_print(batch)
                 # word_mask:以word为单位，1为真实输入，0为PAD
-                inputs, word_mask, _, dep_ids = self._unpack_batch(self.args, batch)
+                unpacked_batch = self._unpack_batch(self.args, batch)
                 # word_pad_mask:以word为单位，1为PAD，0为真实输入
-                word_pad_mask = torch.eq(word_mask, 0)
-                unlabeled_scores, labeled_scores = self.model(inputs)
-                labeled_target = dep_ids
+                word_pad_mask = torch.eq(unpacked_batch['word_mask'], 0)
+                model_output = self.model(unpacked_batch['inputs'])
+                unlabeled_scores, labeled_scores = model_output['unlabeled_scores'], model_output['labeled_scores']
+                pos_logits = model_output['pos_logits']
+                labeled_target = unpacked_batch['dep_ids']
                 unlabeled_target = labeled_target.ge(1).to(unlabeled_scores.dtype)
+                pos_target = unpacked_batch['pos_ids']
                 # Calc loss and update:
                 loss, _ = self._update_and_predict(unlabeled_scores, labeled_scores, unlabeled_target, labeled_target,
                                                    word_pad_mask,
                                                    # label_loss_ratio=self.model.module.label_loss_ratio if hasattr(self.model,'module') else self.model.label_loss_ratio,
-                                                   calc_loss=True, update=True, calc_prediction=False)
+                                                   calc_loss=True, update=True, calc_prediction=False,
+                                                   pos_logits=pos_logits, pos_target=pos_target,
+                                                   summary_writer=summary_writer if self.args.local_rank in [-1, 0] else None,
+                                                   global_step=global_step)
                 global_step += 1
                 if loss is not None:
                     epoch_ave_loss += loss
 
                 if global_step % self.args.eval_interval == 0 and self.args.local_rank in [-1, 0]:
                     if not self.args.no_output:
-                        summary_writer.add_scalar('loss/train', loss, global_step)
+                        summary_writer.add_scalar('train_loss/loss', loss, global_step)
                         # 记录学习率
                         for i, param_group in enumerate(self.optimizer.param_groups):
                             summary_writer.add_scalar(f'lr/group_{i}', param_group['lr'], global_step)

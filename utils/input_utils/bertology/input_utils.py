@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 # Created by li huayong on 2019/9/24
+import json
 import os
 import pathlib
+from collections import Counter
+from typing import List
+
 import torch
 from utils.input_utils.bertology.input_class import *
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
 from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
+
+from utils.input_utils.conll_file import CoNLLUData
 from utils.input_utils.custom_dataset import ConcatTensorRandomDataset
 from utils.logger import get_logger
 
@@ -44,7 +50,8 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
                                  sequence_a_segment_id=0,
                                  # sequence_b_segment_id=1,
                                  mask_padding_with_zero=True,
-                                 skip_too_long_input=True):
+                                 skip_too_long_input=True,
+                                 pos_tokenizer=None):
     """ Loads a data file into a list of `InputBatch`s
         `cls_token_at_end` define the location of the CLS token:
             - False (Default, BERT/XLM pattern): [CLS] + A + [SEP] + B + [SEP]
@@ -61,9 +68,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
         #     logger.info("Writing example %d of %d" % (ex_index, len(examples)))
         # print(example.sentence)
         tokens_a = tokenizer.tokenize(example.sentence)
-        # print('tokens:')
-        # print(tokens_a)
-
         # Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
         special_tokens_count = 3 if sep_token_extra else 2
         # 为ROOT表示等预留足够的空间(目前至少预留5个位置)
@@ -111,6 +115,8 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
 
         # The mask has 1 for real tokens and 0 for padding tokens. Only real
         # tokens are attended to.
+        # input_mask:
+        #   如果mask_padding_with_zero=True（默认），则 1 代表 实际输入，0 代表 padding
         input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
         start_pos = example.start_pos
@@ -122,7 +128,8 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
 
         # Zero-pad up to the sequence length.
         padding_length = max_seq_length - len(input_ids)
-        pos_padding_length = max_seq_length - len(start_pos)
+        position_padding_length = max_seq_length - len(start_pos)
+
         if pad_on_left:
             input_ids = ([pad_token] * padding_length) + input_ids
             input_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + input_mask
@@ -131,8 +138,8 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
             # 如果为0的话，又容易和CLS重复，
             # 所以这里选择用max_seq_length-1表示PAD
             # 注意这里max_seq_length至少应该大于实际句长（以字数统计）3到4个位置
-            start_pos = ([max_seq_length - 1] * pos_padding_length) + start_pos
-            end_pos = ([max_seq_length - 1] * pos_padding_length) + end_pos
+            start_pos = ([max_seq_length - 1] * position_padding_length) + start_pos
+            end_pos = ([max_seq_length - 1] * position_padding_length) + end_pos
             assert start_pos[0] == max_seq_length - 1
             assert end_pos[0] == max_seq_length - 1
         else:
@@ -143,15 +150,24 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
             # 如果为0的话，又容易和CLS重复，
             # 所以这里选择用max_seq_length-1表示PAD
             # 注意这里max_seq_length至少应该大于实际句长（以字数统计）3到4个位置
-            start_pos = start_pos + ([max_seq_length - 1] * pos_padding_length)
-            end_pos = end_pos + ([max_seq_length - 1] * pos_padding_length)
+            start_pos = start_pos + ([max_seq_length - 1] * position_padding_length)
+            end_pos = end_pos + ([max_seq_length - 1] * position_padding_length)
             assert start_pos[-1] == max_seq_length - 1
             assert end_pos[-1] == max_seq_length - 1
+        # 开始位置是ROOT，对应的pos设置为PAD (不计算loss)
+        example.pos = ['<PAD>'] + example.pos
+        # 如果长度超过max_seq_length，则需要截断
+        example.pos = example.pos[:max_seq_length]
+        # 将pos序列补足到max_seq_length的长度（用PAD，不计算loss）
+        POS_padding_length = max_seq_length - len(example.pos)
+        example.pos = example.pos + (['<PAD>'] * POS_padding_length)
+        pos_ids = pos_tokenizer.convert_tokens_to_ids(example.pos)
         # print(end_pos)
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
         assert len(segment_ids) == max_seq_length
         assert len(start_pos) == len(end_pos) == max_seq_length
+        assert len(pos_ids) == max_seq_length
 
         # if ex_index < 5:
         #     logger.info("*** Example ***")
@@ -171,12 +187,56 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
                           segment_ids=segment_ids,
                           dep_ids=dep_ids,
                           start_pos=start_pos,
-                          end_pos=end_pos))
+                          end_pos=end_pos,
+                          pos_ids=pos_ids, ))
     if skip_input_num > 0:
         print(f'\n>> convert_examples_to_features skip input:{skip_input_num} !!\n')
     else:
         print('\n>> No sentences are skipped :)\n')
     return features
+
+
+class POSTokenizer(object):
+    def __init__(self, pos_list: List):
+        self.pos_list = ['<PAD>', '<UNK>'] + pos_list
+
+    def convert_tokens_to_ids(self, input_seq: List[str]):
+        result = []
+        for t in input_seq:
+            if t in self.pos_list:
+                result.append(self.pos_list.index(t))
+            else:
+                result.append(self.pos_list.index('<UNK>'))
+        return result
+
+    def get_idx(self, token):
+        return self.pos_list.index(token)
+
+    def get_label_num(self):
+        return len(self.pos_list)
+
+
+def get_pos_tokenizer(conllu_data, new_pos_list, file_path, merge_train=False):
+    assert isinstance(conllu_data, CoNLLUData)
+    assert isinstance(file_path, pathlib.Path)
+    if (new_pos_list and not merge_train) or \
+            (new_pos_list and merge_train and not (file_path / 'pos_list.json').exists()):
+        pos_counter = Counter()
+        for sent in conllu_data.sentences:
+            for word in sent.words:
+                pos_counter[word.pos] += 1
+        pos_list = list(pos_counter.keys())
+        with open(str(file_path / 'pos_list.json'), 'w', encoding='utf-8')as f:
+            json.dump(pos_list, f, ensure_ascii=False)
+        print('>>> get new pos tokenizer')
+    elif (file_path / 'pos_list.json').exists():
+        with open(str(file_path / 'pos_list.json'), 'r', encoding='utf-8')as f:
+            pos_list = json.load(f)
+        print('>>> load pos tokenizer')
+    else:
+        raise RuntimeError()
+    pos_tokenizer = POSTokenizer(pos_list)
+    return pos_tokenizer
 
 
 def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, training=False):
@@ -185,14 +245,18 @@ def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, trai
     processor = CoNLLUProcessor(args, graph_vocab, word_vocab)
 
     label_list = graph_vocab.get_labels()
-    _cwd, _file_name = pathlib.Path(conllu_file_path).cwd(), pathlib.Path(conllu_file_path).name
-    cached_features_file = _cwd / (
-        f'cached_{_file_name}_{"train" if training else "dev"}_{pathlib.Path(args.config_file).name}_{args.encoder_type}')
+    cached_dir, _file_name = pathlib.Path(args.data_dir) / 'cached', pathlib.Path(conllu_file_path).name
+    cached_features_file = cached_dir / (
+        f'cached_{_file_name}_{"train" if training else "dev"}_{args.encoder_type}_pos-{args.use_pos}')
     if cached_features_file.is_file() and args.use_cache:
         logger.info("Loading features from cached file %s", str(cached_features_file))
         conllu_file, features = torch.load(str(cached_features_file))
     else:
         conllu_file, conllu_data = load_conllu_file(conllu_file_path)
+        # 仅在training=True时，生成新的pos_list
+        pos_tokenizer = get_pos_tokenizer(conllu_data, new_pos_list=training, file_path=cached_dir)
+        args.pos_label_pad_idx = pos_tokenizer.get_idx('<PAD>')
+        args.pos_label_num = pos_tokenizer.get_label_num()
         examples = processor.create_bert_example(conllu_data,
                                                  'train' if training else 'dev',
                                                  args.max_seq_len,
@@ -212,6 +276,7 @@ def load_and_cache_examples(args, conllu_file_path, graph_vocab, tokenizer, trai
                                                 pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
                                                 pad_token_segment_id=4 if args.encoder_type in ['xlnet'] else 0,
                                                 skip_too_long_input=args.skip_too_long_input,
+                                                pos_tokenizer=pos_tokenizer
                                                 )
         if args.local_rank in [-1, 0] and args.use_cache:
             logger.info("Saving features into cached file %s", str(cached_features_file))
@@ -229,7 +294,11 @@ def feature_to_dataset(features):
     # print([t.end_pos for t in features])
     all_end_pos = torch.tensor([t.end_pos for t in features], dtype=torch.long)
     all_dep_ids = torch.tensor([t.dep_ids for t in features], dtype=torch.long)
-    dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_start_pos, all_end_pos, all_dep_ids)
+    all_pos_ids = torch.tensor([t.pos_ids for t in features], dtype=torch.long)
+    dataset = TensorDataset(all_input_ids, all_input_mask,
+                            all_segment_ids, all_start_pos,
+                            all_end_pos, all_dep_ids,
+                            all_pos_ids)
     return dataset
 
 

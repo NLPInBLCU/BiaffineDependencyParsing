@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Created by li huayong on 2019/11/19
+from typing import List
+
 import numpy as np
 from utils.input_utils.conll_file import load_conllu_file
 from utils.input_utils.graph_vocab import GraphVocab
@@ -8,7 +10,7 @@ from utils.input_utils.graph_vocab import GraphVocab
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
 
-    def __init__(self, guid, sentence, start_pos, end_pos, deps=None):
+    def __init__(self, guid: str, sentence: str, start_pos: List, end_pos: List, deps: List = None, pos: List = None):
         """Constructs a InputExample.
         """
         self.guid = guid
@@ -16,18 +18,31 @@ class InputExample(object):
         self.start_pos = start_pos
         self.end_pos = end_pos
         self.deps = deps
+        self.pos = pos
 
 
 class InputFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self, input_ids, input_mask, segment_ids, dep_ids, start_pos=None, end_pos=None):
+    def __init__(self, input_ids: List, input_mask: List, segment_ids: List, dep_ids: List, start_pos: List = None,
+                 end_pos: List = None, pos_ids: List = None):
+        """
+            输入的特征，python类型
+        :param input_ids:
+        :param input_mask: 如果mask_padding_with_zero=True（默认），则 1 代表 实际输入，0 代表 padding
+        :param segment_ids:
+        :param dep_ids:
+        :param start_pos: 词语的对应开始序号
+        :param end_pos: 词语的对应结束序号
+        :param pos_ids: 词性ids，开始是一个<PAD>,代表ROOT，后面接<PAD>补足长度, <PAD>均不计算loss
+        """
         self.input_ids = input_ids
         self.input_mask = input_mask
         self.segment_ids = segment_ids
         self.dep_ids = dep_ids
         self.start_pos = start_pos
         self.end_pos = end_pos
+        self.pos_ids = pos_ids
 
 
 class CoNLLUProcessor(object):
@@ -52,12 +67,18 @@ class CoNLLUProcessor(object):
         """Gets a collection of `InputExample`s for the dev set."""
         CoNLLU_file, CoNLLU_data = load_conllu_file(file_path)
         return self.create_bert_example(CoNLLU_data,
-                                         'train' if training else 'dev',
+                                        'train' if training else 'dev',
                                         max_seq_length,
                                         training=training,
                                         ), CoNLLU_file
 
     def _get_words_start_end_pos(self, words_list, max_seq_length):
+        """
+            注意：这里会自动在开始添加一个ROOT的表示
+        :param words_list:
+        :param max_seq_length:
+        :return:
+        """
         s = []
         e = []
         # 0 for ROOT if root_representation == [CLS]
@@ -96,10 +117,11 @@ class CoNLLUProcessor(object):
     def create_bert_example(self, CoNLLU_data, set_type, max_seq_length, training=False):
         examples = []
         # print(CoNLLU_data)
-        for i, sent in enumerate(CoNLLU_data):
+        for i, sent in enumerate(CoNLLU_data.sentences):
             guid = f"{set_type}-{i}"
             words = []
             deps = []
+            pos = []
             if self.args.root_representation == 'cls':
                 # BERT输入会自动添加一个CLS，所以此时不需要特殊处理
                 pass
@@ -112,21 +134,26 @@ class CoNLLUProcessor(object):
                 words.append(self.args.root_representation)
             else:
                 raise Exception(f'illegal root representation:{self.args.root_representation}')
-            for line in sent:
+            for line in sent.words:
                 line_res = []
-                if line[-1] == '_':
+                if line.dep == '_':
+                    # 若line[-1] == '_'，则说明是一个空白conllu文件，只有word（假定没有pos）
                     if deps:
                         # print(CoNLLU_data)
                         raise Exception('illegal CoNLLU data')
-                    words.append(line[0])
+                    # line[0] 是 词语
+                    # 此时只读取word，因为其他位置为空
+                    words.append(line.word)
                     continue
-                arcs = line[-1].split('|')
+                # line[2] 是 依存关系，多个关系用|分割
+                arcs = line.dep.split('|')
                 for arc in arcs:
                     head, dep_rel = arc.split(':')
                     dep_rel_idx = self.graph_vocab.unit2id[dep_rel]
                     line_res.append([int(head), dep_rel_idx])
                 deps.append(line_res)
-                words.append(line[0])
+                words.append(line.word)
+                pos.append(line.pos)
             if not deps:
                 deps = None
 
@@ -148,11 +175,13 @@ class CoNLLUProcessor(object):
                     input_mask = np.random.uniform(0, 1, len(words)) < self.args.input_mask_prob
                     words = ['[MASK]' if z[1] else z[0] for z in zip(words, input_mask)]
                     sentence = "".join(words)
-
+            # 词语的起始位置
+            # 由于BERT是基于token（中文是字）序列输入的，依存分析是以单词为单位的，所以必须确定单词的表示，
+            # 这里使用对应起始位置的向量来表示单词
             start_pos, end_pos = self._get_words_start_end_pos(words, max_seq_length)
 
             examples.append(
-                InputExample(guid=guid, sentence=sentence, start_pos=start_pos, end_pos=end_pos, deps=deps)
+                InputExample(guid=guid, sentence=sentence, start_pos=start_pos, end_pos=end_pos, deps=deps, pos=pos)
             )
         return examples
 

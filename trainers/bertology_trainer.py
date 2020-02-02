@@ -19,18 +19,35 @@ class BERTologyBaseTrainer(BaseDependencyTrainer):
         self._freeze_parameter_names = []
 
     def _unpack_batch(self, args, batch):
+        """
+            dataset = TensorDataset(all_input_ids, all_input_mask,
+                            all_segment_ids, all_start_pos,
+                            all_end_pos, all_dep_ids,
+                            all_pos_ids)
+        :param args:
+        :param batch:
+        :return:
+        """
         inputs = {
             'input_ids': batch[0],
-            'attention_mask': batch[1],
+            'attention_mask': batch[1],  # 默认 1 代表 实际输入； 0 代表 padding
             'token_type_ids': batch[2] if args.encoder_type in ['bertology', 'xlnet'] else None,
             'start_pos': batch[3],
             'end_pos': batch[4],
         }
         dep_ids = batch[5]
+        pos_ids = batch[6]
         # word_mask:以word为单位，1为真实输入，0为PAD
         word_mask = (batch[3] != (args.max_seq_len - 1)).to(torch.long).to(args.device)
         sent_len = torch.sum(word_mask, 1).cpu().tolist()
-        return inputs, word_mask, sent_len, dep_ids
+        unpacked_batch = {
+            'inputs': inputs,
+            'word_mask': word_mask,
+            'sent_len': sent_len,
+            'dep_ids': dep_ids,
+            'pos_ids': pos_ids,
+        }
+        return unpacked_batch
 
     def _custom_train_operations(self, epoch):
         """
@@ -66,6 +83,7 @@ class BERTologyBaseTrainer(BaseDependencyTrainer):
                     for name, para in self.model.named_parameters():
                         if name in self._freeze_parameter_names:
                             para.requires_grad = True
+
 
 if __name__ == '__main__':
     pass

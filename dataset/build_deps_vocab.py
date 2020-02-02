@@ -16,16 +16,16 @@ def build_vocab(data_dir, cutoff=1):
     for conllu_file in data_dir.glob("*/*.conllu"):
         print(f'Loading {str(conllu_file)} ...')
         _, _data = load_conllu_file(str(conllu_file))
-        file_data += _data
+        file_data += _data.sentences
     max_char_length = 0
     max_word_length = 0
     max_char_length_sent = ''
     max_word_length_sent = ''
     for sent in file_data:
         words = []
-        for line in sent:
-            arcs = line[-1]
-            words.append(line[0])
+        for line in sent.words:
+            arcs = line.dep
+            words.append(line.word)
             arcs = arcs.split('|')
             for arc in arcs:
                 deprel = arc.split(':')[1]

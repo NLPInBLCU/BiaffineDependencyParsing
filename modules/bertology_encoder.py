@@ -53,6 +53,7 @@ class BERTologyEncoder(nn.Module):
             after_layers=0,
             max_seq_len=None,
             after_dropout=0.1,
+            **kwargs,
     ):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() and not no_cuda else "cpu")

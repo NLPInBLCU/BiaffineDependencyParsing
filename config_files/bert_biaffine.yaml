@@ -35,6 +35,8 @@ merge_train_data:
   merge_train_exp: 0.7
   # 仅在merge_train_mode == 'prob' 时生效
   merge_train_prob: [0.6,0.4]
+multi_task:
+  use_pos: true
 output:
   output_dir: 'output'
   log_name: 'bert_parser'

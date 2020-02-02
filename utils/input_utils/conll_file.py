@@ -3,6 +3,7 @@ A wrapper/loader for the official conll-u format files.
 """
 import os
 import io
+from typing import List, Tuple
 
 FIELD_NUM = 10
 
@@ -256,6 +257,27 @@ class CoNLLFile(object):
         return
 
 
+class CoNLLUWord(object):
+    def __init__(self, word_data):
+        self.word = word_data[0]
+        self.pos = word_data[1]
+        self.dep = word_data[2]
+
+
+class CoNLLUSent(object):
+    def __init__(self, conllu_sent: List):
+        self.words = []
+        for word in conllu_sent:
+            self.words.append(CoNLLUWord(word))
+
+
+class CoNLLUData(object):
+    def __init__(self, conllu_data: List):
+        self.sentences = []
+        for sent in conllu_data:
+            self.sentences.append(CoNLLUSent(sent))
+
+
 def load_conllu_file(filename):
     """
     Conllu file 格式:
@@ -294,7 +316,8 @@ def load_conllu_file(filename):
     #   ['想', 'VV', '0:Root'],
     #   ['的', 'SP', '17:mTone'],
     #   ['。', 'PU', '17:mPunc']]
-    return conll_file, data
+    return conll_file, CoNLLUData(data)
+
 
 if __name__ == '__main__':
     from pprint import pprint
