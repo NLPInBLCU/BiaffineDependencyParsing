@@ -133,7 +133,7 @@ def train(args):
     logger.info(f'train batch size: {args.train_batch_size}')
     logger.info(f'train data batch num: {len(train_data_loader)}')
     # 每个epoch做两次dev：
-    args.eval_interval = len(train_data_loader) // 2
+    args.eval_interval = len(train_data_loader) // 2 if len(train_data_loader) > 100 else 30
     logger.info(f'eval interval: {args.eval_interval}')
     # 注意该参数影响学习率warm up
     args.max_train_steps = len(train_data_loader) * args.max_train_epochs
