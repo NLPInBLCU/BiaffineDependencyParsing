@@ -13,10 +13,12 @@ run:
   eval_interval: 100
   early_stop: false
   early_stop_epochs: 6
+  test_after_train: true
 data_set:
-  data_dir: 'dataset'
-  train_file: 'train/text_news.train.conllu'
-  dev_file: 'dev/sdp_text_dev.conllu'
+  data_dir: 'dataset/medical3000'
+  train_file: 'train/medical.train.2400.conllu'
+  dev_file: 'dev/medical.dev.300.conllu'
+  test_file: 'test/medical.test.300.conllu'
   # GPU 32GB:80; 24GB:64; 16GB:40 12GB:30 10GB:20
   per_gpu_train_batch_size: 40
   # GPU <=12GB:10; >12GB:20或者30
@@ -36,7 +38,7 @@ merge_train_data:
   # 仅在merge_train_mode == 'prob' 时生效
   merge_train_prob: [0.6,0.4]
 multi_task:
-  use_pos: true
+  use_pos: false
 output:
   output_dir: 'output'
   log_name: 'bert_parser'

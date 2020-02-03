@@ -42,7 +42,7 @@ def build_vocab(data_dir, cutoff=1):
             del counter[k]
     id_list = list(sorted(list(counter.keys()), key=lambda k: counter[k], reverse=True))
     id2unit = ['<EMPTY>', '<UNK>'] + id_list
-    with open('graph_vocab.txt', 'w', encoding='utf-8')as f:
+    with open(str(data_dir / 'graph_vocab.txt'), 'w', encoding='utf-8')as f:
         for u in id2unit:
             f.write(u + '\n')
     print(f'max char length sent:')
@@ -57,4 +57,4 @@ def build_vocab(data_dir, cutoff=1):
 if __name__ == '__main__':
     from pprint import pprint
 
-    pprint(build_vocab('.'))
+    pprint(build_vocab('medical3000'))
