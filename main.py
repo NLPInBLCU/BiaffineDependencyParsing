@@ -35,6 +35,7 @@ def load_trainer(args):
 
     if args.run_mode == 'train':
         # 默认train模式下是基于原始BERT预训练模型的参数开始的
+        # 实际保持initialize_from_bertology=True也没有影响（既可以从BERT模型初始化，也可以断点恢复训练）
         model = BiaffineDependencyModel.from_pretrained(args, initialize_from_bertology=True)
     else:
         model = BiaffineDependencyModel.from_pretrained(args, initialize_from_bertology=False)

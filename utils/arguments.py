@@ -71,9 +71,10 @@ def parse_args():
     args_dict['cpu'] = args.no_cuda
     args_dict['local_rank'] = args.local_rank
     args_dict['no_output'] = args.no_output
+    if args.model_path is not None:
+        args_dict['saved_model_path'] = args.model_path
     if args.run in ['dev', 'inference']:
         # 覆盖模型路径
-        args_dict['saved_model_path'] = args.model_path
         args_dict['input_conllu_path'] = args.input
         args_dict['output_conllu_path'] = args.output
     args = ArgsClass(args_dict)
