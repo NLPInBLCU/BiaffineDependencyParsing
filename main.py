@@ -12,6 +12,7 @@
 """
 import copy
 import logging
+import os
 
 import torch
 import pathlib
@@ -153,7 +154,7 @@ def train(args):
     logger.info('train DONE')
     if args.test_after_train and not args.no_output:
         args.saved_model_path = args.output_model_dir
-        args.input_conllu_path = args.test_file
+        args.input_conllu_path = os.path.join(args.data_dir, args.test_file)
         args.output_conllu_path = 'tmp/tmp_file'
         args.run_mode = 'dev'
         dev(args)
