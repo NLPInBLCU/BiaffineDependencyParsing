@@ -3,8 +3,8 @@
 from typing import List
 
 import numpy as np
-from utils.input_utils.conll_file import load_conllu_file
-from utils.input_utils.graph_vocab import GraphVocab
+from utils.data.conll_file import load_conllu_file
+from utils.data.graph_vocab import GraphVocab
 
 
 class InputExample(object):
@@ -42,7 +42,8 @@ class InputFeatures(object):
         self.dep_ids = dep_ids
         self.start_pos = start_pos
         self.end_pos = end_pos
-        self.pos_ids = pos_ids
+        if pos_ids:
+            self.pos_ids = pos_ids
 
 
 class CoNLLUProcessor(object):

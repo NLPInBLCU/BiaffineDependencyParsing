@@ -8,14 +8,14 @@ from tqdm import tqdm, trange
 from abc import ABCMeta, abstractmethod
 
 from utils.information import debug_print
-from utils.input_utils.conll_file import CoNLLFile
-from utils.input_utils.graph_vocab import GraphVocab
-from utils.model_utils.get_optimizer import get_optimizer
-from utils.model_utils.parser_funs import sdp_decoder, parse_semgraph
-import utils.model_utils.sdp_simple_scorer as sdp_scorer
+from utils.data.conll_file import CoNLLFile
+from utils.data.graph_vocab import GraphVocab
+from utils.model.get_optimizer import get_optimizer
+from utils.model.parser_funs import sdp_decoder, parse_semgraph
+import utils.model.sdp_simple_scorer as sdp_scorer
 from utils.best_result import BestResult
 from utils.seed import set_seed
-from utils.model_utils.label_smoothing import label_smoothed_kl_div_loss
+from utils.model.label_smoothing import label_smoothed_kl_div_loss
 from utils.logger import get_logger
 
 try:
@@ -184,10 +184,13 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 word_pad_mask = torch.eq(unpacked_batch['word_mask'], 0)
                 model_output = self.model(unpacked_batch['inputs'])
                 unlabeled_scores, labeled_scores = model_output['unlabeled_scores'], model_output['labeled_scores']
-                pos_logits = model_output['pos_logits']
                 labeled_target = unpacked_batch['dep_ids']
                 unlabeled_target = labeled_target.ge(1).to(unlabeled_scores.dtype)
-                pos_target = unpacked_batch['pos_ids']
+                if self.args.use_pos:
+                    pos_logits = model_output['pos_logits']
+                    pos_target = unpacked_batch['pos_ids']
+                else:
+                    pos_target = pos_logits = None
                 # Calc loss and update:
                 loss, _ = self._update_and_predict(unlabeled_scores, labeled_scores, unlabeled_target, labeled_target,
                                                    word_pad_mask,
@@ -213,7 +216,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                             summary_writer.add_scalar('metrics/uas', UAS, global_step)
                             summary_writer.add_scalar('metrics/las', LAS, global_step)
                         if best_result.is_new_record(LAS=LAS, UAS=UAS,
-                                                     global_step=global_step) and self.args.local_rank in [-1, 0]:
+                                                     epoch=epoch) and self.args.local_rank in [-1, 0]:
                             self.logger.info(f"\n## NEW BEST RESULT in epoch {epoch} ##")
                             self.logger.info('\n' + str(best_result))
                             # 保存最优模型：
@@ -224,7 +227,10 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                                 else:
                                     self.model.save_pretrained(self.args.output_model_dir)
 
-                if self.args.early_stop and global_step - best_result.best_LAS_step > self.args.early_stop_steps:
+                if self.args.early_stop and epoch - best_result.best_LAS_epoch > self.args.early_stop_epochs \
+                        and self.args.local_rank == -1:
+                    # 当使用 torch.distributed 训练时无法使用 early stop
+                    # todo fix bug [bug when use torch.distributed.launch !!]
                     self.logger.info(f'\n## Early stop in step:{global_step} ##')
                     train_stop = True
                     break
@@ -241,7 +247,8 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
             summary_writer.close()
 
     def dev(self, dev_data_loader, dev_CoNLLU_file, input_conllu_path=None, output_conllu_path=None):
-        assert isinstance(dev_CoNLLU_file, CoNLLFile)
+        if not isinstance(dev_CoNLLU_file, CoNLLFile):
+            raise RuntimeError(f'dev_conllu_file type:{type(dev_CoNLLU_file)}')
         if input_conllu_path is None:
             input_conllu_path = os.path.join(self.args.data_dir, self.args.dev_file)
         if output_conllu_path is None:
@@ -279,7 +286,6 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 raise e
             predictions += batch_prediction
             # batch_sent_lens += sent_lens
-
         dev_CoNLLU_file.set(['deps'], [dep for sent in predictions for dep in sent])
         if output_conllu_path:
             dev_CoNLLU_file.write_conll(output_conllu_path)
@@ -302,7 +308,7 @@ class BaseDependencyTrainer(metaclass=ABCMeta):
                 }
             """
             inputs, word_mask, sent_lens, _ = unpacked_batch['inputs'], unpacked_batch['word_mask'], \
-                                                    unpacked_batch['sent_len'], unpacked_batch['dep_ids']
+                                              unpacked_batch['sent_len'], unpacked_batch['dep_ids']
             word_mask = torch.eq(word_mask, 0)
             model_output = self.model(inputs)
             unlabeled_scores, labeled_scores = model_output['unlabeled_scores'], model_output['labeled_scores']

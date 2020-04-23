@@ -36,7 +36,8 @@ class BERTologyBaseTrainer(BaseDependencyTrainer):
             'end_pos': batch[4],
         }
         dep_ids = batch[5]
-        pos_ids = batch[6]
+        if args.use_pos:
+            pos_ids = batch[6]
         # word_mask:以word为单位，1为真实输入，0为PAD
         word_mask = (batch[3] != (args.max_seq_len - 1)).to(torch.long).to(args.device)
         sent_len = torch.sum(word_mask, 1).cpu().tolist()
@@ -45,8 +46,9 @@ class BERTologyBaseTrainer(BaseDependencyTrainer):
             'word_mask': word_mask,
             'sent_len': sent_len,
             'dep_ids': dep_ids,
-            'pos_ids': pos_ids,
         }
+        if args.use_pos:
+            unpacked_batch['pos_ids'] = pos_ids
         return unpacked_batch
 
     def _custom_train_operations(self, epoch):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Created by li huayong on 2019/9/24
-from utils.input_utils.conll_file import load_conllu_file
+from utils.data.conll_file import load_conllu_file
 from pathlib import Path
 from NLP_utils.easy_ltp import EasyLTP
 

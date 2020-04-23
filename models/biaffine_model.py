@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 # Created by li huayong on 2019/10/7
-import os
-import pathlib
 
-import torch
 import torch.nn as nn
 
-from utils.input_utils.bertology.input_utils import load_bert_tokenizer, load_and_cache_examples, get_data_loader
-from utils.input_utils.graph_vocab import GraphVocab
+from utils.data.graph_vocab import GraphVocab
 from modules.bertology_encoder import BERTologyEncoder
 from modules.biaffine import DeepBiaffineScorer, DirectBiaffineScorer
 from models.base_model import BaseModel

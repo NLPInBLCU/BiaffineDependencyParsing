@@ -139,7 +139,16 @@ class CoNLLFile(object):
                 if '-' in ln[0]:
                     continue
                 if len(field_idxs) == 1:
-                    ln[field_idxs[0]] = contents[cidx]
+                    try:
+                        ln[field_idxs[0]] = contents[cidx]
+                    except IndexError as e:
+                        print(sent)
+                        print(len(contents))
+                        print(cidx)
+                        print(fields)
+                        print(field_idxs)
+                        raise e
+
                     if fields == ['deps']:
                         head_value, deprel_value = contents[cidx].split('|')[0].split(':')
                         ln[FIELD_TO_IDX['head']] = head_value

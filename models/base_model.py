@@ -6,11 +6,13 @@ import pathlib
 import torch
 import torch.nn as nn
 
+
 class BaseModel(nn.Module):
     """
         所有model的父类；实现了保存了加载方法，
         注意这里和具体的模型框架组成相关，这里用了bertology作为encoder的组成！
     """
+
     def save_pretrained(self, save_directory, weight_file_name="pytorch_model.bin"):
         """ Save a model and its configuration file to a directory, so that it
         """
@@ -50,7 +52,8 @@ class BaseModel(nn.Module):
             args.saved_model_path = saved_model_path
         model = cls(args)
         resolved_archive_file = pathlib.Path(args.saved_model_path) / weight_file_name
-        assert resolved_archive_file.exists()
+        if not resolved_archive_file.exists():
+            raise RuntimeError(f'Can not find {str(resolved_archive_file)}')
         state_dict = torch.load(str(resolved_archive_file), map_location='cpu')
         # Convert old format to new format if needed from a PyTorch state_dict
         old_keys = []

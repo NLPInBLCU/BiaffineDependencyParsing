@@ -5,17 +5,8 @@ import torch.nn as nn
 
 from pytorch_transformers import (BertConfig,
                                   BertTokenizer,
-                                  RobertaConfig,
-                                  RobertaForSequenceClassification,
-                                  RobertaTokenizer,
-                                  XLMConfig, XLMForSequenceClassification,
-                                  XLMTokenizer, XLNetConfig,
-                                  XLNetForSequenceClassification,
-                                  XLNetTokenizer, BertModel)
+                                  BertModel)
 
-from utils.information import debug_print
-from utils.input_utils.bertology.input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
-from utils.input_utils.graph_vocab import GraphVocab
 from modules.layer_attention import LayerAttention
 from modules.transformer_layer import TransformerSentenceEncoderLayer
 

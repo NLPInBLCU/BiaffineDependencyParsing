@@ -3,32 +3,36 @@
 # （2）字符串用单引号引起来
 # （3）浮点数或者科学计数法必须用小数点（否则可能被当做字符串）
 # （4）布尔类型：true，false
+
+# 注意：
+# 这里使用两侧嵌套的yaml映射保存参数配置，加载时外层映射会被忽略掉
+
 run:
   cuda: true
   cpu: false
   seed: 1234
   #只需要指定最大的epoch数量，不需要指定最大steps
   #可能的选择：80,150
-  max_train_epochs: 80
-  eval_interval: 100
+  max_train_epochs: 40
+  eval_epoch: 1
   early_stop: false
   early_stop_epochs: 6
-  test_after_train: true
 data_set:
-  data_dir: 'dataset/medical3000'
-  train_file: 'train/medical.train.2400.conllu'
-  dev_file: 'dev/medical.dev.300.conllu'
-  test_file: 'test/medical.test.300.conllu'
+  data_dir: 'dataset/sem16'
+  train_file: 'train/text_news.train.conllu'
+  dev_file: 'dev/sdp_news_dev.conllu'
+  test_file: 'test/sdp_news_test.conllu'
   # GPU 32GB:80; 24GB:64; 16GB:40 12GB:30 10GB:20
-  per_gpu_train_batch_size: 40
+  per_gpu_train_batch_size: 12
   # GPU <=12GB:10; >12GB:20或者30
-  per_gpu_eval_batch_size: 20
-  skip_too_long_input: true
-  loader_worker_num: 10
+  per_gpu_eval_batch_size: 5
+#  skip_too_long_input: false
+  loader_worker_num: 4
+#  是否缓存保存处理后的数据
   use_cache: true
 merge_train_data:
   # 幂指数加权采样：在多个不同领域数据之间如何合理地采样
-  # 是够采用幂指数平滑采样: utils.input_utils.custom_dataset.ConcatTensorRandomDataset
+  # 是够采用幂指数平滑采样: utils.data.custom_dataset.ConcatTensorRandomDataset
   merge_training: false
   train_text_file: 'train/sdp_text_train.conllu'
   train_news_file: 'train/sdp_news_train.conllu'
@@ -45,21 +49,17 @@ output:
   save_best_model: false
 graph_vocab:
   #依存弧的vocab，必须提前生成
-  graph_vocab_file: 'dataset/graph_vocab.txt'
+  graph_vocab_file: 'dataset/sem16/graph_vocab.txt'
 Model:
   saved_model_path: '/search/hadoop02/suanfa/lihuayong/data/pretrain/ernie_1/'
-#  saved_model_path: ''
-#  saved_model_path: ''
 encoder:
   #encoder的类型：bertology,transformer,lstm ....
   encoder_type: 'bertology'
   encoder_output_dim: 768
-CharRNN:
-Transformer:
 BERTology:
-  #最大长度 必须超过数据集的最大长度（字数）,新闻领域的最大句长可达233
   bertology_type: 'bert'
-  max_seq_len: 100
+  #最大长度 必须超过数据集的最大长度（字数）,新闻领域的最大句长可达233，如果过小则会报错
+  max_seq_len: 260
   #ROOT的表示形式：unused,cls,root ....
   root_representation: 'unused'
   #中文单词的提取方式：s,e,s+e,s-e

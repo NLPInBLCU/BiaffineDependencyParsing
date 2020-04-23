@@ -11,7 +11,7 @@
 -------------------------------------------------
 """
 from models.deprecated_hdlstm_biaffine import HDLSTMBiaffine
-from utils.model_utils import LSTMModelWrapper
+from utils.model import LSTMModelWrapper
 
 
 def load_model(args, vocab=None, pretrain=None):
