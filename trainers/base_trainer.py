@@ -14,9 +14,9 @@ from utils.model.get_optimizer import get_optimizer
 from utils.model.parser_funs import sdp_decoder, parse_semgraph
 import utils.model.sdp_simple_scorer as sdp_scorer
 from utils.best_result import BestResult
-from utils.seed import set_seed
 from utils.model.label_smoothing import label_smoothed_kl_div_loss
-from utils.logger import get_logger
+from PyToolkit.PyToolkit import get_logger
+from PyToolkit.PyToolkit.seed import set_seed
 
 try:
     from torch.utils.tensorboard import SummaryWriter

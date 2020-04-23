@@ -60,7 +60,7 @@ def parse_args() -> SimpleNamespace:
     dev_infer_parent_parser.add_argument('-i', '--input_conllu_path', required=True,
                                          help='输入CONLL-U文件，dev模式下是一个gold file，infer模式下是一个空conllu file')
     dev_infer_parent_parser.add_argument('-o', '--output_conllu_path', required=True, help='dev或者infer的输出文件路径')
-    dev_infer_parent_parser.add_argument('-b', '--batch_size', default=None, help='dev或者infer时刻的batch大小')
+    dev_infer_parent_parser.add_argument('-b', '--batch_size', default=5, type=int, help='dev或者infer时刻的batch大小')
     # -----------------------再处理dev和infer各自的参数（如果有）--------------------------------------------
     parser_dev = subparsers.add_parser('dev', help='验证模式', parents=[dev_infer_parent_parser])
     parser_infer = subparsers.add_parser('infer', help='推理模式', parents=[dev_infer_parent_parser])
@@ -79,7 +79,7 @@ def parse_args() -> SimpleNamespace:
         # 获取yaml配置文件之后将 saved_model_path 调整为 saved_model_path/model，指向真正放置模型参数的文件夹
         configs['saved_model_path'] = str(Path(configs['saved_model_path']) / 'model')
         if configs['batch_size']:
-            configs['eval_batch_size'] = configs['batch_size']
+            configs['per_gpu_eval_batch_size'] = configs['batch_size']
         del configs['batch_size']
 
     if not yaml_config_file.exists():
@@ -105,4 +105,4 @@ def parse_args() -> SimpleNamespace:
 if __name__ == '__main__':
     from pprint import pprint
 
-    parse_args()
+    pprint(vars(parse_args()))

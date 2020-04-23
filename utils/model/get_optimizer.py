@@ -5,8 +5,7 @@ import math
 import torch
 # from model.optimization import *
 import pytorch_transformers.optimization as huggingfaceOptim  # 避免和torch.optim重名
-from utils.debug_print import debug_print
-from utils.logger import get_logger
+from PyToolkit.PyToolkit import get_logger, debug_print
 
 
 def get_optimizer_old(name, parameters, lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):

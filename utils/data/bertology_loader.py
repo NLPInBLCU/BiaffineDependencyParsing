@@ -8,15 +8,13 @@ from collections import Counter
 from multiprocessing import Pool
 from functools import partial
 import torch
+from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
 from utils.data.bertology_base import *
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
-from pytorch_transformers import BertTokenizer, RobertaTokenizer, XLMTokenizer, XLNetTokenizer
-
 from utils.data.conll_file import CoNLLUData
 from utils.data.custom_dataset import ConcatTensorRandomDataset
-from utils.logger import get_logger
-from utils.timer import Timer
+from PyToolkit.PyToolkit import get_logger, Timer
 
 BERTology_TOKENIZER = {
     'bert': BertTokenizer,
