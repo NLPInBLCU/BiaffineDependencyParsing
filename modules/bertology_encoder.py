@@ -5,17 +5,8 @@ import torch.nn as nn
 
 from pytorch_transformers import (BertConfig,
                                   BertTokenizer,
-                                  RobertaConfig,
-                                  RobertaForSequenceClassification,
-                                  RobertaTokenizer,
-                                  XLMConfig, XLMForSequenceClassification,
-                                  XLMTokenizer, XLNetConfig,
-                                  XLNetForSequenceClassification,
-                                  XLNetTokenizer, BertModel)
+                                  BertModel)
 
-from utils.information import debug_print
-from utils.input_utils.bertology.input_utils import load_bert_tokenizer, get_data_loader, load_and_cache_examples
-from utils.input_utils.graph_vocab import GraphVocab
 from modules.layer_attention import LayerAttention
 from modules.transformer_layer import TransformerSentenceEncoderLayer
 
@@ -53,6 +44,7 @@ class BERTologyEncoder(nn.Module):
             after_layers=0,
             max_seq_len=None,
             after_dropout=0.1,
+            **kwargs,
     ):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() and not no_cuda else "cpu")

@@ -15,27 +15,29 @@
 - [x] 保存、加载
 - [x] 模型部分参数冻结
 - [x] Input Masking
+- [x] **调整学习率、最大步数、warmup prop**
+- [x] 多领域数据的采样（参考多语BERT-指数平滑加权）
+- [x] support distributedDataParallel
+- [x] 保存加载预处理的dataset
+- [x] 模型参数不同学习率
 ## High Priority
-- [ ] **调整学习率、最大步数、warmup prop**
-- [ ] 多领域数据的采样（参考多语BERT-指数平滑加权）
 - [ ] **多任务训练 + POS 标注**
-- [ ] 解决Biaffine分类（二分类、多分类）的类别不平衡问题
 - [ ] **加入Label Smoothing,缺少ignore_index的实现**
-- [ ] 重构预测得到probs的后处理部分
 - [ ] 支持roberta
-- [ ] 模型参数不同学习率
+- [ ] 支持xlnet
 ## Middle Priority
-- [ ] 保存加载预处理的dataset
+- [ ] 多任务训练 + NER
+- [ ] 解决Biaffine分类（二分类、多分类）的类别不平衡问题
 - [ ] decoder部分的参数初始化
 - [ ] 按照累计句长划分batch
 - [ ] 多任务训练 text/news分成两个decoder一起训练（此时训练集也得分开）
+- [ ] 重构预测得到probs的后处理部分
 ## Low Priority
+- [ ] 加入图神经网络
 - [ ] 修改GraphVocab，支持过滤低频次的标签
-- [ ] 支持xlnet
 - [ ] 重构Transformer的输入
 - [ ] 重构Transformer的encoder
 - [ ] 重构CharRNN的输入
 - [ ] 重构HLSTM的encoder
 - [ ] 支持句法依存分析
 - [ ] inverse square root learning rate decay (Vaswani et al., 2017). 
-- [ ] 多任务训练 + NER

@@ -26,7 +26,7 @@ data_set:
   use_cache: true
 merge_train_data:
   # 幂指数加权采样：在多个不同领域数据之间如何合理地采样
-  # 是够采用幂指数平滑采样: utils.input_utils.custom_dataset.ConcatTensorRandomDataset
+  # 是够采用幂指数平滑采样: utils.data.custom_dataset.ConcatTensorRandomDataset
   merge_training: false
   train_text_file: 'train/sdp_text_train.conllu'
   train_news_file: 'train/sdp_news_train.conllu'
@@ -35,6 +35,8 @@ merge_train_data:
   merge_train_exp: 0.7
   # 仅在merge_train_mode == 'prob' 时生效
   merge_train_prob: [0.6,0.4]
+multi_task:
+  use_pos: true
 output:
   output_dir: 'output'
   log_name: 'bert_parser'

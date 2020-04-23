@@ -13,7 +13,7 @@ from fairseq.modules import (
     LayerNorm,
     MultiheadAttention,
 )
-from utils.model_utils.initialization import init_bert_params
+from utils.model.initialization import init_bert_params
 
 
 class TransformerSentenceEncoderLayer(nn.Module):
