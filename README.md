@@ -18,11 +18,15 @@ BERT+Transformer+Biaffine dependency parser
 
 数据集处理完成之后需要在yaml配置文件中写入，例如：
 
->data_set:
->    `data_dir`: 'dataset/sem16'
->    `train_file`: 'train/text_news.train.conllu'
->    `dev_file`: 'dev/sdp_news_dev.conllu'
->    `test_file`: 'test/sdp_news_test.conllu'
+> data_set:
+>
+>`data_dir`: 'dataset/sem16'
+>
+>`train_file`: 'train/text_news.train.conllu'
+>
+>`dev_file`: 'dev/sdp_news_dev.conllu'
+>
+>`test_file`: 'test/sdp_news_test.conllu'
 
 同时根据数据集的相关信息合理设置`per_gpu_train_batch_size`、`max_seq_len`等参数
 

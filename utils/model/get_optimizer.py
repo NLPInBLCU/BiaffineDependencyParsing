@@ -5,7 +5,7 @@ import math
 import torch
 # from model.optimization import *
 import pytorch_transformers.optimization as huggingfaceOptim  # 避免和torch.optim重名
-from utils.information import debug_print
+from utils.debug_print import debug_print
 from utils.logger import get_logger
 
 

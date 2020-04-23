@@ -496,6 +496,7 @@ def load_bert_tokenizer(model_path, model_type, do_lower_case=True):
 
 
 def load_bertology_input(args):
+    # todo: 现在没有很好地区分加载不同数据的过程，建议改写为显示输入加载位置，而不是在本程序中根据configs硬编码
     # Make sure only the first process in distributed training process the dataset, and the others will use the cache
     # if args.local_rank not in [-1, 0] and args.run_mode == 'train':
     #     torch.distributed.barrier()
@@ -507,8 +508,9 @@ def load_bertology_input(args):
     if args.command == 'train' and args.local_rank in [-1, 0]:
         tokenizer.save_pretrained(args.output_model_dir)
 
-    if args.command in ['dev', 'inference']:
+    if args.command in ['dev', 'infer', 'test_after_train']:
         # training 影响 Input Mask
+        logger.info(f'Load data from {args.input_conllu_path}')
         dataset, conllu_file = load_and_cache_examples(args, args.input_conllu_path, vocab, tokenizer, training=False)
         data_loader = get_data_loader(dataset, batch_size=args.eval_batch_size, evaluation=True,
                                       num_worker=args.loader_worker_num)
@@ -547,3 +549,5 @@ def load_bertology_input(args):
                                           evaluation=True,
                                           num_worker=args.loader_worker_num)
         return train_data_loader, train_conllu_file, dev_data_loader, dev_conllu_file
+    else:
+        raise RuntimeError('不支持的command {train、dev、infer、test_after_train}')
