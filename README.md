@@ -6,11 +6,32 @@ BERT+Transformer+Biaffine dependency parser
 
 ## Result
 ![metrics](./metrics_line.svg)
-以上结果均为 Semeval-2016 Test集 测试LAS
 
-详细结果见[metrics记录](./metrics.csv)
+以上结果均为在Semeval-2016-Test集上测试得到的LAS
+
+**详细结果见: [metrics记录](./metrics.csv)**
+
+## Semeval-2016 Task9数据集
+原始评测数据集：[HIT-SCIR/SemEval-2016: SemEval-2016 Task 9: Chinese Semantic Dependency Parsing](https://github.com/HIT-SCIR/SemEval-2016)
+
+原始数据集格式不符合conllu格式，你也可以使用我们[处理过后的数据集](https://github.com/LiangsLi/LSTM_Biaffine_Dependency_Parser_PyTorch/tree/master/SDP)，或者使用[脚本](https://github.com/LiangsLi/ConlluToolkit/blob/master/ConlluToolkit/convert.py)自己处理
+
+数据集处理完成之后需要在yaml配置文件中写入，例如：
+
+> data_set:
+>
+>`data_dir`: 'dataset/sem16'
+>
+>`train_file`: 'train/text_news.train.conllu'
+>
+>`dev_file`: 'dev/sdp_news_dev.conllu'
+>
+>`test_file`: 'test/sdp_news_test.conllu'
+
+同时根据数据集的相关信息合理设置`per_gpu_train_batch_size`、`max_seq_len`等参数
 
 ## 使用
+
 ### 训练Train
 查看帮助信息：`python main.py train -h`
 

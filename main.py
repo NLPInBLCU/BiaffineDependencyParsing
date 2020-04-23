@@ -21,10 +21,9 @@ import yaml
 from trainers.bertology_trainer import BERTologyBaseTrainer
 from models.biaffine_model import BiaffineDependencyModel
 from utils.arguments import parse_args
-from utils.seed import set_seed
-from utils.timer import Timer
-from utils.logger import init_logger, get_logger
 from utils.data.bertology_loader import load_bertology_input
+from PyToolkit.PyToolkit import Timer, init_logger, get_logger
+from PyToolkit.PyToolkit.seed import set_seed
 
 logger = init_logger('parser', only_console=True)
 
