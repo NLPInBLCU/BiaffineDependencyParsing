@@ -30,13 +30,13 @@ for y in ys_data:
     plt.plot(xs, ys_data[y], marker='o', label=y)
 for ys in ys_data:
     for x, y in zip(xs, ys_data[ys]):
-        plt.text(x, y, y)
+        plt.text(x, y, y, fontsize=10)
 
 plt.legend(fontsize=14)
 plt.grid(True)
 
 mplcyberpunk.add_glow_effects()
-
+plt.savefig('metrics_line.svg')
 plt.show()
 
 if __name__ == '__main__':

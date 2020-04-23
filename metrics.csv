@@ -1,0 +1,5 @@
+model_name,text_las,news_las,remark
+Ding-2014,71.94,62.29,Ding Yu et al. 2014
+AAAI-2018,72.92,63.3,Wang Yuxuan et al. 2018 in AAAI
+NLPCC-2018,80.4,69.66,Shen Zizhuo et al. 2019 in NLPCC
+Baidu-ERINE,82.7332,69.9189,Baidu-ERINE+Transformer

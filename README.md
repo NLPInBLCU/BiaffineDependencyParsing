@@ -1,39 +1,61 @@
 # BiaffineDependencyParsing
-Various Encoder Layers (~~vanilla LSTM/Highway Droput LSTM/Transformer/~~BERTology) + Biaffine Decoder for Dependency Parsing
+BERT+Transformer+Biaffine dependency parser
+## Update
+
+[2020-04-23] 修复数据加载中一个bug，在use_cache=True时可大幅度缩短数据加载准备耗时
+
 ## Result
+![metrics](./metrics_line.svg)
+以上结果均为 Semeval-2016 Test集 测试LAS
 
-<table><tr><th rowspan="2">Model</th><th colspan="2">TEXT</th><th colspan="2">NEWS</th></tr><tr><td>dev</td><td>test</td><td>dev</td><td>test</td></tr><tr><td>AAAI2018</td><td>-</td><td>72.92</td><td>-</td><td>63.30</td></tr><tr><td>腾讯词向量+斯坦福模型</td><td>81.371</td><td>80.669</td><td>-</td><td>-</td></tr><tr><td>BERT 初始版本</td><td>81.01</td><td>-</td><td>-</td><td>-</td></tr><tr><td>BERT+Transformer</td><td>82.35</td><td>-</td><td>-</td><td>-</td></tr></table>
-
-## 相关项目：
-- https://github.com/Hyperparticle/udify
-- https://github.com/nikitakit/self-attentive-parser
-- https://github.com/WangYuxuan93/CLBT
-- https://github.com/stanfordnlp/stanfordnlp
+详细结果见[metrics记录](./metrics.csv)
 
 ## 使用
 ### 训练Train
+查看帮助信息：`python main.py train -h`
+
 ```shell
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py -c config_files/bert_biaffine.yaml
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py train -c config_files/bert_biaffine.yaml
 ```
 ### torch.distributed 分布式训练
 
 [distributedDataParallel VS dataParallel](parallelTrain.md)
 
+> 当GPU卡数较多或数据量较大（或者max_seq_len较大时），推荐使用`torch.distributed`训练
+
 ```shell script
-CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 main.py -c config_files/bert_biaffine.yaml
+CUDA_VISIBLE_DEVICES=0,1,2,3,5,6 python -m torch.distributed.launch --nproc_per_node=6 main.py -c config_files/bert_biaffine.yaml
 ```
 
 ### 验证Dev
+
+查看帮助信息：`python main.py dev -h`
+
 ```shell
-python main.py -c config_files/bert_biaffine.yaml \
-               --run dev --model_path <训练好的模型路径> \
-               --input <测试输入conllu文件路径> \
-               --output <测试输出conllu文件路径> \
+CUDA_VISIBLE_DEVICES=0 python main.py dev -m <模型保存路径> -i <输入gold conllu文件> -o <输出文件>
 ```
 ### 推理Inference
+
+查看帮助信息：`python main.py infer -h`
+
 ```shell
-python main.py -c config_files/bert_biaffine.yaml \
-               --run inference --model_path <训练好的模型路径> \
-               --input <输入conllu文件路径> \
-               --output <输出conllu文件路径> \
+CUDA_VISIBLE_DEVICES=0 python main.py infer -m <模型保存路径> -i <输入conllu文件> -o <输出文件>
 ```
+## References
+
+**\[1\]** Ding, Y., Shao, Y., Che, W., Liu, T., 2014. Dependency Graph Based Chinese Semantic Parsing, in: Sun, M., Liu, Y., Zhao, J. (Eds.), Chinese Computational Linguistics and Natural Language Processing Based on Naturally Annotated Big Data, Lecture Notes in Computer Science. Springer International Publishing, Cham, pp. 58–69. https://doi.org/10.1007/978-3-319-12277-9_6
+
+**\[2\]** Wang, Y., Che, W., Guo, J., Liu, T., 2018. A Neural Transition-Based Approach for Semantic Dependency Graph Parsing, in: AAAI.
+
+**\[3\]** Dozat, T., Manning, C.D., 2018. Simpler but More Accurate Semantic Dependency Parsing, in: Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers). Presented at the ACL 2018, Association for Computational Linguistics, Melbourne, Australia, pp. 484–490. https://doi.org/10.18653/v1/P18-2077
+
+**\[4\]** Li, Y., Li, Z., Zhang, M., Wang, R., Li, S., Si, L., 2019. Self-attentive biaffine dependency parsing, in: IJCAI International Joint Conference on Artificial Intelligence. pp. 5067–5073. https://doi.org/10.24963/ijcai.2019/704
+
+**\[5\]** Kondratyuk, D., Straka, M., 2019. 75 Languages, 1 Model: Parsing Universal Dependencies Universally. pp. 2779–2795. https://doi.org/10.18653/v1/d19-1279
+
+## 相关项目：
+
+- https://github.com/Hyperparticle/udify
+- https://github.com/nikitakit/self-attentive-parser
+- https://github.com/WangYuxuan93/CLBT
+- https://github.com/stanfordnlp/stanfordnlp
